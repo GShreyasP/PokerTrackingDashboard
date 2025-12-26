@@ -1,0 +1,23 @@
+{
+  "name": "poker-money-tracker",
+  "version": "1.0.0",
+  "description": "A web application for tracking poker money and chips during game sessions",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx serve ."
+  },
+  "keywords": [
+    "poker",
+    "money-tracker",
+    "chips",
+    "gaming"
+  ],
+  "author": "GShreyasP",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GShreyasP/PokerTrackingDashboard.git"
+  }
+}
+

@@ -1,50 +1,118 @@
 # Poker Money Tracker
 
-A web application for tracking poker money and chips during a game session.
+A web application for tracking poker money and chips during a game session. Track balances, manage chips, and monitor transactions in real-time.
 
-## How to Use
+## 🚀 Live Demo
 
-1. **Open the website**: Simply open `index.html` in your web browser (double-click the file or right-click and select "Open with" your preferred browser).
+Deployed on Vercel: [View Live Site](https://poker-tracking-dashboard.vercel.app)
 
-2. **Initial Setup**:
+## 📋 How to Use
+
+1. **Initial Setup**:
    - Enter the number of people playing
-   - For each person, enter their name and initial money amount
-   - Enter the total number of chips given out
-   - Enter how many chips make up one stack
+   - Enter how much 1 stack is worth ($)
+   - Enter how many chips are in one stack
    - Toggle whether all chips are worth the same value
-     - If **same value**: The chip value will be calculated as (Total Money / Total Chips)
+     - If **same value**: Chip value is calculated automatically (stack value / chips per stack)
      - If **different values**: Enter the dollar value for each chip color (black, white, green, red, blue)
 
-3. **Start Tracking**: Click "Start Tracking" to begin
+2. **Start Tracking**: Click "Start Tracking" to go to the dashboard
 
-4. **Managing Money**:
-   - Each person has a widget showing their current balance
-   - Click **"+ Add Money"** to add more stacks/money to a person
-   - Click **"- Remove Money"** when a person repays the bank
+3. **Dashboard Features**:
+   - Each person starts with 1 stack automatically
+   - Edit names and money directly in the widgets
+   - **Balance Display**: 
+     - Red (negative) = They put in more money than they got back
+     - Green (positive) = They got back more than they put in (profit!)
+   - Click **"+ Add"** to add more stacks/money
+   - Click **"- Subtract"** to return chips (enter number of chips to return)
+   - View personal transaction logs by clicking "View Personal Log" under each widget
 
-5. **View Totals**:
-   - The **Total Pot** shows the sum of all money currently in play
-   - The **Transaction Log** shows all transactions with timestamps
+4. **Tracking**:
+   - **Total Pot**: Shows net money in pot (money put in - money returned)
+   - **Total Chips in Play**: Tracks all chips to verify counts
+   - **Transaction Log**: Complete history of all transactions
+   - **Personal Logs**: Individual transaction history for each person
 
-## Example
+## 💡 Features
 
-If 4 people each put in $10, and 80 total chips were given out (20 chips per person), and each chip is worth the same:
-- Total Money: $40
-- Total Chips: 80
-- Chip Value: $40 / 80 = $0.50 per chip
-
-## Features
-
-- ✅ Track multiple people and their money
+- ✅ Track multiple people and their balances
 - ✅ Support for same-value or different-value chips
-- ✅ Add/remove money during the game
-- ✅ Real-time total pot calculation
+- ✅ Partial stack additions (e.g., 0.5 stacks)
+- ✅ Return chips (even more than you have - from other players)
+- ✅ Real-time balance calculation (red for negative, green for profit)
+- ✅ Total pot tracking (accounts for money returned)
+- ✅ Total chips tracker for verification
 - ✅ Transaction log with timestamps
+- ✅ Personal transaction logs for each player
+- ✅ Data persistence with localStorage
 - ✅ Modern, responsive UI
+- ✅ Deployed and ready to use
 
-## Files
+## 🛠️ Development
 
-- `index.html` - Main HTML structure
-- `style.css` - Styling and layout
-- `script.js` - Application logic
+### Local Development
+
+```bash
+# Clone the repository
+git clone https://github.com/GShreyasP/PokerTrackingDashboard.git
+
+# Navigate to the directory
+cd PokerTrackingDashboard
+
+# Open index.html in your browser
+# Or use a local server:
+npx serve .
+```
+
+### Deploy to Vercel
+
+1. Import the repository in Vercel
+2. Vercel will automatically detect it as a static site
+3. Deploy! No build step needed.
+
+Or use Vercel CLI:
+```bash
+npm i -g vercel
+vercel
+```
+
+## 📁 Project Structure
+
+```
+PokerTrackingDashboard/
+├── index.html      # Main HTML structure
+├── style.css       # Styling and layout
+├── script.js       # Application logic
+├── vercel.json     # Vercel deployment configuration
+├── package.json    # Project metadata
+└── README.md       # This file
+```
+
+## 🎮 Example Usage
+
+**Setup:**
+- 4 people playing
+- 1 stack = $10
+- 20 chips per stack
+- All chips worth the same
+
+**Result:**
+- Each person starts with $10 and 20 chips
+- Chip value = $10 / 20 = $0.50 per chip
+- Total Pot = $40
+- Total Chips = 80
+
+**During Game:**
+- Person A returns 30 chips → Gets $15 back → Balance becomes +$5.00 (green)
+- Person B adds 0.5 stacks → Adds $5 and 10 chips → Balance becomes -$15.00 (red)
+- Total Pot updates automatically
+
+## 📝 License
+
+MIT
+
+## 👤 Author
+
+GShreyasP
 
