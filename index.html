@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poker Money Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Poker Money Tracker</h1>
+        
+        <!-- Initial Setup Section -->
+        <div id="setup-section" class="setup-section">
+            <h2>Initial Setup</h2>
+            
+            <div class="form-group">
+                <label for="num-people">Number of People:</label>
+                <input type="number" id="num-people" min="1" value="4">
+            </div>
+            
+            <div class="form-group">
+                <label for="stack-value">How much is 1 stack worth? ($):</label>
+                <input type="number" id="stack-value" min="0" step="0.01">
+            </div>
+            
+            <div class="form-group">
+                <label for="chips-per-stack">Chips per Stack:</label>
+                <input type="number" id="chips-per-stack" min="1" step="1">
+            </div>
+            
+            <div class="form-group">
+                <label class="toggle-label">
+                    <input type="checkbox" id="same-value-toggle">
+                    <span>All chips are worth the same</span>
+                </label>
+            </div>
+            
+            <div id="different-chips-section" class="hidden">
+                <h3>Chip Values</h3>
+                <div class="chip-inputs">
+                    <div class="form-group">
+                        <label for="black-value">Black Chip Value ($):</label>
+                        <input type="number" id="black-value" min="0" step="0.01" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="white-value">White Chip Value ($):</label>
+                        <input type="number" id="white-value" min="0" step="0.01" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="green-value">Green Chip Value ($):</label>
+                        <input type="number" id="green-value" min="0" step="0.01" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="red-value">Red Chip Value ($):</label>
+                        <input type="number" id="red-value" min="0" step="0.01" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="blue-value">Blue Chip Value ($):</label>
+                        <input type="number" id="blue-value" min="0" step="0.01" value="0">
+                    </div>
+                </div>
+            </div>
+            
+            <button id="setup-btn" class="btn btn-primary">Start Tracking</button>
+        </div>
+        
+        <!-- Main Tracking Section -->
+        <div id="tracking-section" class="tracking-section hidden">
+            <div class="tracking-header">
+                <div class="total-pot">
+                    <h2>Total Pot: $<span id="total-pot-amount">0.00</span></h2>
+                    <div id="chip-value-display" class="chip-value-display"></div>
+                </div>
+                <div class="header-actions">
+                    <button id="add-person-btn" class="btn btn-add-person" onclick="showAddPersonForm()">+ Add Person</button>
+                    <button id="reset-btn" class="btn btn-reset" onclick="resetData()">Reset All Data</button>
+                </div>
+            </div>
+            
+            <div id="people-widgets" class="people-widgets"></div>
+            
+            <div class="chip-total-tracker">
+                <h3>Total Chips in Play: <span id="total-chips-amount">0</span></h3>
+            </div>
+            
+            <div class="transaction-log">
+                <h2>Transaction Log</h2>
+                <div id="log-entries" class="log-entries"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
+

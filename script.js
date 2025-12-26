@@ -1,0 +1,800 @@
+// State management
+let state = {
+    people: [],
+    stackValue: 0, // Dollar value of 1 stack
+    chipsPerStack: 0,
+    sameValue: true,
+    chipValue: 0, // $ per chip when all chips are same
+    chipValues: { // Individual chip values when different
+        black: 0,
+        white: 0,
+        green: 0,
+        red: 0,
+        blue: 0
+    },
+    transactions: []
+};
+
+// DOM Elements
+const setupSection = document.getElementById('setup-section');
+const trackingSection = document.getElementById('tracking-section');
+const numPeopleInput = document.getElementById('num-people');
+const stackValueInput = document.getElementById('stack-value');
+const chipsPerStackInput = document.getElementById('chips-per-stack');
+const sameValueToggle = document.getElementById('same-value-toggle');
+const differentChipsSection = document.getElementById('different-chips-section');
+const setupBtn = document.getElementById('setup-btn');
+const peopleWidgetsDiv = document.getElementById('people-widgets');
+const totalPotAmount = document.getElementById('total-pot-amount');
+const chipValueDisplay = document.getElementById('chip-value-display');
+const totalChipsAmount = document.getElementById('total-chips-amount');
+const logEntriesDiv = document.getElementById('log-entries');
+
+// Initialize
+sameValueToggle.addEventListener('change', toggleChipValueMode);
+setupBtn.addEventListener('click', startTracking);
+
+// Load state from localStorage on page load
+function loadState() {
+    const savedState = localStorage.getItem('pokerTrackerState');
+    if (savedState) {
+        try {
+            const parsed = JSON.parse(savedState);
+            // Restore state
+            Object.assign(state, parsed);
+            
+            // Convert timestamp strings back to Date objects
+            state.transactions.forEach(t => {
+                t.timestamp = new Date(t.timestamp);
+            });
+            
+            // Migrate old data: ensure all people have moneyPutIn and moneyReturned
+            state.people.forEach(person => {
+                if (person.moneyPutIn === undefined) {
+                    // For old data, use initialMoney or totalMoney as moneyPutIn
+                    person.moneyPutIn = person.initialMoney || person.totalMoney || 0;
+                }
+                if (person.moneyReturned === undefined) {
+                    person.moneyReturned = 0;
+                }
+            });
+            
+            // If we have people, show tracking section
+            if (state.people.length > 0) {
+                setupSection.classList.add('hidden');
+                trackingSection.classList.remove('hidden');
+                renderPeopleWidgets();
+                updateTotalPot();
+                updateChipValueDisplay();
+                updateTotalChips();
+                renderLog();
+            }
+        } catch (e) {
+            console.error('Error loading state:', e);
+        }
+    }
+}
+
+// Save state to localStorage
+function saveState() {
+    try {
+        localStorage.setItem('pokerTrackerState', JSON.stringify(state));
+    } catch (e) {
+        console.error('Error saving state:', e);
+    }
+}
+
+// Reset all data
+function resetData() {
+    if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
+        localStorage.removeItem('pokerTrackerState');
+        state = {
+            people: [],
+            stackValue: 0,
+            chipsPerStack: 0,
+            sameValue: true,
+            chipValue: 0,
+            chipValues: {
+                black: 0,
+                white: 0,
+                green: 0,
+                red: 0,
+                blue: 0
+            },
+            transactions: []
+        };
+        setupSection.classList.remove('hidden');
+        trackingSection.classList.add('hidden');
+        // Reset form inputs
+        numPeopleInput.value = 4;
+        stackValueInput.value = '';
+        chipsPerStackInput.value = '';
+        sameValueToggle.checked = true;
+        toggleChipValueMode();
+    }
+}
+
+// Toggle between same/different chip values
+function toggleChipValueMode() {
+    const sameValue = sameValueToggle.checked;
+    state.sameValue = sameValue;
+    differentChipsSection.classList.toggle('hidden', sameValue);
+}
+
+// Start tracking - go directly to dashboard
+function startTracking() {
+    // Save chip configuration
+    state.stackValue = parseFloat(stackValueInput.value) || 0;
+    state.chipsPerStack = parseInt(chipsPerStackInput.value) || 0;
+    state.sameValue = sameValueToggle.checked;
+    
+    if (state.sameValue) {
+        // Calculate $ per chip: stack value / chips per stack
+        state.chipValue = state.chipsPerStack > 0 ? state.stackValue / state.chipsPerStack : 0;
+    } else {
+        // Get individual chip values
+        state.chipValues.black = parseFloat(document.getElementById('black-value').value) || 0;
+        state.chipValues.white = parseFloat(document.getElementById('white-value').value) || 0;
+        state.chipValues.green = parseFloat(document.getElementById('green-value').value) || 0;
+        state.chipValues.red = parseFloat(document.getElementById('red-value').value) || 0;
+        state.chipValues.blue = parseFloat(document.getElementById('blue-value').value) || 0;
+    }
+    
+    // Get number of people and create person widgets with 1 stack each
+    const numPeople = parseInt(numPeopleInput.value) || 1;
+    
+    // Only create new people if we don't have any yet
+    if (state.people.length === 0) {
+        state.people = [];
+        for (let i = 0; i < numPeople; i++) {
+            // Each person starts with 1 stack
+            const initialMoney = state.stackValue;
+            const initialChips = state.chipsPerStack;
+            
+            state.people.push({
+                id: i,
+                name: `Person ${i + 1}`,
+                totalMoney: initialMoney,
+                initialMoney: initialMoney,
+                moneyPutIn: initialMoney, // Track money put into pot
+                moneyReturned: 0, // Track money returned
+                chips: initialChips
+            });
+            
+            // Add initial transaction
+            if (initialMoney > 0) {
+                addTransaction(i, state.people[i].name, initialMoney, 'add');
+            }
+        }
+    }
+    
+    // Hide setup, show tracking
+    setupSection.classList.add('hidden');
+    trackingSection.classList.remove('hidden');
+    
+    // Render widgets and update display
+    renderPeopleWidgets();
+    updateTotalPot();
+    updateChipValueDisplay();
+    updateTotalChips();
+    renderLog();
+    saveState();
+}
+
+// Show add person form
+function showAddPersonForm() {
+    // Hide any other open forms
+    document.querySelectorAll('.widget-form-container').forEach(form => {
+        form.style.display = 'none';
+    });
+    
+    // Create a temporary form container at the top of widgets
+    let addPersonContainer = document.getElementById('add-person-container');
+    if (!addPersonContainer) {
+        addPersonContainer = document.createElement('div');
+        addPersonContainer.id = 'add-person-container';
+        addPersonContainer.className = 'widget-form-container';
+        peopleWidgetsDiv.insertBefore(addPersonContainer, peopleWidgetsDiv.firstChild);
+    }
+    
+    addPersonContainer.innerHTML = `
+        <div class="widget-form">
+            <h4>Add New Person</h4>
+            <div class="form-row">
+                <label>Name:</label>
+                <input type="text" id="new-person-name" placeholder="Enter name" class="form-input">
+            </div>
+            <div class="form-row">
+                <label>Initial Money ($):</label>
+                <input type="number" id="new-person-money" min="0" step="0.01" value="${state.stackValue || 0}" class="form-input">
+                <small>Default: 1 stack ($${state.stackValue.toFixed(2)})</small>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-submit" onclick="submitAddPerson()">Add Person</button>
+                <button class="btn btn-cancel" onclick="hideAddPersonForm()">Cancel</button>
+            </div>
+        </div>
+    `;
+    addPersonContainer.style.display = 'block';
+}
+
+// Hide add person form
+function hideAddPersonForm() {
+    const addPersonContainer = document.getElementById('add-person-container');
+    if (addPersonContainer) {
+        addPersonContainer.style.display = 'none';
+    }
+}
+
+// Submit add person
+function submitAddPerson() {
+    const name = document.getElementById('new-person-name').value.trim();
+    let money = parseFloat(document.getElementById('new-person-money').value);
+    
+    if (!name) {
+        alert('Please enter a name for the person.');
+        return;
+    }
+    
+    // Default to 1 stack if no money entered
+    if (isNaN(money) || money === 0) {
+        money = state.stackValue || 0;
+    }
+    
+    // Get next ID
+    const nextId = state.people.length > 0 ? Math.max(...state.people.map(p => p.id)) + 1 : 0;
+    
+    const newPerson = {
+        id: nextId,
+        name: name,
+        totalMoney: money,
+        initialMoney: money,
+        moneyPutIn: money,
+        moneyReturned: 0,
+        chips: 0
+    };
+    
+    // Calculate chips
+    if (state.sameValue && state.chipValue > 0) {
+        newPerson.chips = Math.round(money / state.chipValue);
+    } else if (state.sameValue && state.chipsPerStack > 0 && state.stackValue > 0) {
+        // If same value and using stack, calculate based on stack
+        newPerson.chips = Math.round((money / state.stackValue) * state.chipsPerStack);
+    } else {
+        // For different values, chips will be 0 initially
+        newPerson.chips = 0;
+    }
+    
+    state.people.push(newPerson);
+    
+    // Add transaction if money > 0
+    if (money > 0) {
+        addTransaction(newPerson.id, newPerson.name, money, 'add');
+    }
+    
+    hideAddPersonForm();
+    renderPeopleWidgets();
+    updateTotalPot();
+    updateTotalChips();
+    renderLog();
+    saveState();
+}
+
+// Render people widgets
+function renderPeopleWidgets() {
+    peopleWidgetsDiv.innerHTML = '';
+    
+    state.people.forEach(person => {
+        // Calculate balance: moneyReturned - moneyPutIn
+        // Negative = they put in more (owe money), Positive = they made money
+        const balance = (person.moneyReturned || 0) - (person.moneyPutIn || 0);
+        const balanceClass = balance >= 0 ? 'balance-positive' : 'balance-negative';
+        const balanceSign = balance >= 0 ? '+' : '';
+        
+        const widgetContainer = document.createElement('div');
+        widgetContainer.className = 'widget-container';
+        
+        const widget = document.createElement('div');
+        widget.className = 'person-widget';
+        widget.id = `widget-${person.id}`;
+        widget.innerHTML = `
+            <div class="widget-header">
+                <input type="text" class="widget-name-input" value="${person.name}" 
+                       onchange="updatePersonName(${person.id}, this.value)"
+                       onblur="updatePersonName(${person.id}, this.value)"
+                       placeholder="Person Name">
+            </div>
+            <div class="widget-balance ${balanceClass}">
+                <div class="balance-label">Balance</div>
+                <div class="balance-amount">${balanceSign}$${Math.abs(balance).toFixed(2)}</div>
+            </div>
+            <div class="widget-actions">
+                <button class="btn btn-add" onclick="showAddForm(${person.id})">+ Add</button>
+                <button class="btn btn-remove" onclick="showSubtractForm(${person.id})">- Subtract</button>
+            </div>
+        `;
+        
+        widgetContainer.appendChild(widget);
+        
+        // Add form container (initially hidden)
+        const formContainer = document.createElement('div');
+        formContainer.className = 'widget-form-container';
+        formContainer.id = `form-${person.id}`;
+        formContainer.style.display = 'none';
+        widgetContainer.appendChild(formContainer);
+        
+        // Add personal log dropdown
+        const personalLogContainer = document.createElement('div');
+        personalLogContainer.className = 'personal-log-container';
+        personalLogContainer.id = `personal-log-${person.id}`;
+        personalLogContainer.innerHTML = `
+            <button class="personal-log-toggle" onclick="togglePersonalLog(${person.id})">
+                <span>View Personal Log</span>
+                <span class="toggle-arrow">▼</span>
+            </button>
+            <div class="personal-log-content" id="personal-log-content-${person.id}" style="display: none;"></div>
+        `;
+        widgetContainer.appendChild(personalLogContainer);
+        
+        peopleWidgetsDiv.appendChild(widgetContainer);
+    });
+    
+    // Render personal logs for all people
+    state.people.forEach(person => {
+        renderPersonalLog(person.id);
+    });
+}
+
+// Show add form
+function showAddForm(personId) {
+    const person = state.people.find(p => p.id === personId);
+    if (!person) return;
+    
+    // Hide any other open forms
+    document.querySelectorAll('.widget-form-container').forEach(form => {
+        form.style.display = 'none';
+    });
+    
+    const formContainer = document.getElementById(`form-${personId}`);
+    if (!formContainer) return;
+    
+    if (state.sameValue) {
+        // Same value: show stacks input (allow partial stacks)
+        formContainer.innerHTML = `
+            <div class="widget-form">
+                <h4>Add Money for ${person.name}</h4>
+                <div class="form-row">
+                    <label>Number of Stacks:</label>
+                    <input type="number" id="add-stacks-${personId}" min="0" step="0.1" value="0" class="form-input">
+                    <small>You can enter partial stacks (e.g., 0.5)</small>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-submit" onclick="submitAdd(${personId})">Add</button>
+                    <button class="btn btn-cancel" onclick="hideForm(${personId})">Cancel</button>
+                </div>
+            </div>
+        `;
+    } else {
+        // Different values: show all chip inputs
+        formContainer.innerHTML = `
+            <div class="widget-form">
+                <h4>Add Chips for ${person.name}</h4>
+                <div class="chip-inputs-grid">
+                    <div class="chip-input-row">
+                        <label>Black ($${state.chipValues.black.toFixed(2)}):</label>
+                        <input type="number" id="add-black-${personId}" min="0" step="1" value="0" class="form-input">
+                    </div>
+                    <div class="chip-input-row">
+                        <label>White ($${state.chipValues.white.toFixed(2)}):</label>
+                        <input type="number" id="add-white-${personId}" min="0" step="1" value="0" class="form-input">
+                    </div>
+                    <div class="chip-input-row">
+                        <label>Green ($${state.chipValues.green.toFixed(2)}):</label>
+                        <input type="number" id="add-green-${personId}" min="0" step="1" value="0" class="form-input">
+                    </div>
+                    <div class="chip-input-row">
+                        <label>Red ($${state.chipValues.red.toFixed(2)}):</label>
+                        <input type="number" id="add-red-${personId}" min="0" step="1" value="0" class="form-input">
+                    </div>
+                    <div class="chip-input-row">
+                        <label>Blue ($${state.chipValues.blue.toFixed(2)}):</label>
+                        <input type="number" id="add-blue-${personId}" min="0" step="1" value="0" class="form-input">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-submit" onclick="submitAdd(${personId})">Add</button>
+                    <button class="btn btn-cancel" onclick="hideForm(${personId})">Cancel</button>
+                </div>
+            </div>
+        `;
+    }
+    
+    formContainer.style.display = 'block';
+}
+
+// Show subtract form
+function showSubtractForm(personId) {
+    const person = state.people.find(p => p.id === personId);
+    if (!person) return;
+    
+    // Hide any other open forms
+    document.querySelectorAll('.widget-form-container').forEach(form => {
+        form.style.display = 'none';
+    });
+    
+    const formContainer = document.getElementById(`form-${personId}`);
+    if (!formContainer) return;
+    
+    if (state.sameValue) {
+        // Same value: show chips input (allow returning more than they have)
+        formContainer.innerHTML = `
+            <div class="widget-form">
+                <h4>Return Chips for ${person.name}</h4>
+                <div class="form-row">
+                    <label>Number of Chips to Return:</label>
+                    <input type="number" id="subtract-chips-${personId}" min="0" step="1" value="0" class="form-input">
+                    <small>You can return more chips than you have (from other players)</small>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-submit" onclick="submitSubtract(${personId})">Return</button>
+                    <button class="btn btn-cancel" onclick="hideForm(${personId})">Cancel</button>
+                </div>
+            </div>
+        `;
+    } else {
+        // Different values: show all chip inputs
+        formContainer.innerHTML = `
+            <div class="widget-form">
+                <h4>Subtract Chips for ${person.name}</h4>
+                <div class="chip-inputs-grid">
+                    <div class="chip-input-row">
+                        <label>Black ($${state.chipValues.black.toFixed(2)}):</label>
+                        <input type="number" id="subtract-black-${personId}" min="0" step="1" value="0" class="form-input">
+                    </div>
+                    <div class="chip-input-row">
+                        <label>White ($${state.chipValues.white.toFixed(2)}):</label>
+                        <input type="number" id="subtract-white-${personId}" min="0" step="1" value="0" class="form-input">
+                    </div>
+                    <div class="chip-input-row">
+                        <label>Green ($${state.chipValues.green.toFixed(2)}):</label>
+                        <input type="number" id="subtract-green-${personId}" min="0" step="1" value="0" class="form-input">
+                    </div>
+                    <div class="chip-input-row">
+                        <label>Red ($${state.chipValues.red.toFixed(2)}):</label>
+                        <input type="number" id="subtract-red-${personId}" min="0" step="1" value="0" class="form-input">
+                    </div>
+                    <div class="chip-input-row">
+                        <label>Blue ($${state.chipValues.blue.toFixed(2)}):</label>
+                        <input type="number" id="subtract-blue-${personId}" min="0" step="1" value="0" class="form-input">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-submit" onclick="submitSubtract(${personId})">Subtract</button>
+                    <button class="btn btn-cancel" onclick="hideForm(${personId})">Cancel</button>
+                </div>
+            </div>
+        `;
+    }
+    
+    formContainer.style.display = 'block';
+}
+
+// Hide form
+function hideForm(personId) {
+    const formContainer = document.getElementById(`form-${personId}`);
+    if (formContainer) {
+        formContainer.style.display = 'none';
+    }
+}
+
+// Submit add
+function submitAdd(personId) {
+    const person = state.people.find(p => p.id === personId);
+    if (!person) return;
+    
+    let amount = 0;
+    let chipsToAdd = 0;
+    
+    if (state.sameValue) {
+        const numStacks = parseFloat(document.getElementById(`add-stacks-${personId}`).value) || 0;
+        chipsToAdd = Math.round(numStacks * state.chipsPerStack);
+        amount = numStacks * state.stackValue;
+    } else {
+        const black = parseInt(document.getElementById(`add-black-${personId}`).value) || 0;
+        const white = parseInt(document.getElementById(`add-white-${personId}`).value) || 0;
+        const green = parseInt(document.getElementById(`add-green-${personId}`).value) || 0;
+        const red = parseInt(document.getElementById(`add-red-${personId}`).value) || 0;
+        const blue = parseInt(document.getElementById(`add-blue-${personId}`).value) || 0;
+        
+        chipsToAdd = black + white + green + red + blue;
+        amount = (black * state.chipValues.black) +
+                 (white * state.chipValues.white) +
+                 (green * state.chipValues.green) +
+                 (red * state.chipValues.red) +
+                 (blue * state.chipValues.blue);
+    }
+    
+    if (amount > 0 || chipsToAdd > 0) {
+        // Update chips
+        person.chips = (person.chips || 0) + chipsToAdd;
+        
+        // Track money put in (for balance calculation)
+        person.moneyPutIn = (person.moneyPutIn || 0) + amount;
+        
+        // Update total money (for display purposes, though we use balance now)
+        person.totalMoney = (person.totalMoney || 0) + amount;
+        
+        addTransaction(personId, person.name, amount, 'add');
+        hideForm(personId);
+        renderPeopleWidgets();
+        updateTotalPot();
+        updateTotalChips();
+        renderLog();
+        // Update personal log if it's open
+        const personalLogContent = document.getElementById(`personal-log-content-${personId}`);
+        if (personalLogContent && personalLogContent.style.display !== 'none') {
+            renderPersonalLog(personId);
+        }
+        saveState();
+    } else {
+        alert('Please enter a valid amount to add.');
+    }
+}
+
+// Submit subtract
+function submitSubtract(personId) {
+    const person = state.people.find(p => p.id === personId);
+    if (!person) return;
+    
+    let amount = 0;
+    let chipsToReturn = 0;
+    
+    if (state.sameValue) {
+        chipsToReturn = parseInt(document.getElementById(`subtract-chips-${personId}`).value) || 0;
+        
+        if (chipsToReturn <= 0) {
+            alert('Please enter a valid number of chips to return.');
+            return;
+        }
+        
+        // Calculate amount based on chips returned
+        amount = chipsToReturn * state.chipValue;
+    } else {
+        const black = parseInt(document.getElementById(`subtract-black-${personId}`).value) || 0;
+        const white = parseInt(document.getElementById(`subtract-white-${personId}`).value) || 0;
+        const green = parseInt(document.getElementById(`subtract-green-${personId}`).value) || 0;
+        const red = parseInt(document.getElementById(`subtract-red-${personId}`).value) || 0;
+        const blue = parseInt(document.getElementById(`subtract-blue-${personId}`).value) || 0;
+        
+        chipsToReturn = black + white + green + red + blue;
+        amount = (black * state.chipValues.black) +
+                 (white * state.chipValues.white) +
+                 (green * state.chipValues.green) +
+                 (red * state.chipValues.red) +
+                 (blue * state.chipValues.blue);
+        
+        if (chipsToReturn <= 0) {
+            alert('Please enter a valid number of chips to return.');
+            return;
+        }
+    }
+    
+    if (chipsToReturn > 0) {
+        // Update chips (can go negative if returning more than they have)
+        person.chips = (person.chips || 0) - chipsToReturn;
+        
+        // Track money returned (for balance calculation)
+        person.moneyReturned = (person.moneyReturned || 0) + amount;
+        
+        // Update total money (for display purposes, though we use balance now)
+        person.totalMoney = (person.totalMoney || 0) - amount;
+        
+        addTransaction(personId, person.name, amount, 'remove');
+        hideForm(personId);
+        renderPeopleWidgets();
+        updateTotalPot();
+        updateTotalChips();
+        renderLog();
+        // Update personal log if it's open
+        const personalLogContent = document.getElementById(`personal-log-content-${personId}`);
+        if (personalLogContent && personalLogContent.style.display !== 'none') {
+            renderPersonalLog(personId);
+        }
+        saveState();
+    }
+}
+
+// Update person name
+function updatePersonName(personId, newName) {
+    const person = state.people.find(p => p.id === personId);
+    if (person) {
+        person.name = newName || `Person ${personId + 1}`;
+        // Update transaction log entries with old name
+        state.transactions.forEach(transaction => {
+            if (transaction.personId === personId) {
+                transaction.personName = person.name;
+            }
+        });
+        renderLog();
+        saveState();
+    }
+}
+
+// Update person money (when manually editing - treat as initial put in)
+function updatePersonMoney(personId, newMoney) {
+    const person = state.people.find(p => p.id === personId);
+    if (person) {
+        const newMoneyValue = parseFloat(newMoney) || 0;
+        
+        // Update money put in (treating manual edit as initial contribution)
+        person.moneyPutIn = newMoneyValue;
+        person.totalMoney = newMoneyValue;
+        
+        // Update chips if same value
+        if (state.sameValue && state.chipValue > 0) {
+            person.chips = Math.round(person.totalMoney / state.chipValue);
+        }
+        
+        renderPeopleWidgets();
+        updateTotalPot();
+        updateTotalChips();
+        renderLog();
+        saveState();
+    }
+}
+
+// Add transaction to log
+function addTransaction(personId, personName, amount, type) {
+    const transaction = {
+        id: Date.now(),
+        personId: personId,
+        personName: personName,
+        amount: amount,
+        type: type, // 'add' or 'remove'
+        timestamp: new Date()
+    };
+    
+    state.transactions.push(transaction);
+}
+
+// Update total pot
+function updateTotalPot() {
+    // Total pot = sum of (money put in - money returned) for all people
+    const total = state.people.reduce((sum, person) => {
+        const moneyPutIn = person.moneyPutIn || 0;
+        const moneyReturned = person.moneyReturned || 0;
+        return sum + (moneyPutIn - moneyReturned);
+    }, 0);
+    totalPotAmount.textContent = total.toFixed(2);
+    updateChipValueDisplay();
+}
+
+// Update total chips tracker
+function updateTotalChips() {
+    const total = state.people.reduce((sum, person) => sum + (person.chips || 0), 0);
+    totalChipsAmount.textContent = total;
+}
+
+// Update chip value display
+function updateChipValueDisplay() {
+    if (state.sameValue && state.chipValue > 0) {
+        chipValueDisplay.textContent = `Each chip is worth $${state.chipValue.toFixed(2)}`;
+        chipValueDisplay.style.display = 'block';
+    } else {
+        chipValueDisplay.style.display = 'none';
+    }
+}
+
+// Toggle personal log dropdown
+function togglePersonalLog(personId) {
+    const content = document.getElementById(`personal-log-content-${personId}`);
+    const arrow = document.querySelector(`#personal-log-${personId} .toggle-arrow`);
+    
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        arrow.textContent = '▲';
+        renderPersonalLog(personId);
+    } else {
+        content.style.display = 'none';
+        arrow.textContent = '▼';
+    }
+}
+
+// Render personal log for a specific person
+function renderPersonalLog(personId) {
+    const person = state.people.find(p => p.id === personId);
+    if (!person) return;
+    
+    const logContent = document.getElementById(`personal-log-content-${personId}`);
+    if (!logContent) return;
+    
+    // Filter transactions for this person
+    const personTransactions = state.transactions.filter(t => t.personId === personId);
+    
+    if (personTransactions.length === 0) {
+        logContent.innerHTML = '<div class="log-empty">No transactions yet</div>';
+        return;
+    }
+    
+    logContent.innerHTML = '';
+    
+    // Show most recent first
+    const sortedTransactions = [...personTransactions].reverse();
+    
+    sortedTransactions.forEach(transaction => {
+        const logEntry = document.createElement('div');
+        // Reverse colors: add = red (putting money in), remove = green (returning money)
+        const colorClass = transaction.type === 'add' ? 'log-remove' : 'log-add';
+        logEntry.className = `log-entry ${colorClass}`;
+        
+        const timeStr = transaction.timestamp.toLocaleTimeString();
+        const dateStr = transaction.timestamp.toLocaleDateString();
+        // Reverse signs: add = negative (putting money in), remove = positive (returning money)
+        const sign = transaction.type === 'add' ? '-' : '+';
+        const typeText = transaction.type === 'add' ? 'added' : 'removed';
+        
+        logEntry.innerHTML = `
+            <div class="log-time">${dateStr} ${timeStr}</div>
+            <div class="log-details">
+                <span class="log-action">${typeText}</span>
+                <span class="log-amount">${sign}$${transaction.amount.toFixed(2)}</span>
+            </div>
+        `;
+        
+        logContent.appendChild(logEntry);
+    });
+}
+
+// Render transaction log
+function renderLog() {
+    logEntriesDiv.innerHTML = '';
+    
+    if (state.transactions.length === 0) {
+        logEntriesDiv.innerHTML = '<div class="log-empty">No transactions yet</div>';
+        return;
+    }
+    
+    // Show most recent first
+    const sortedTransactions = [...state.transactions].reverse();
+    
+    sortedTransactions.forEach(transaction => {
+        const logEntry = document.createElement('div');
+        // Reverse colors: add = red (putting money in), remove = green (returning money)
+        const colorClass = transaction.type === 'add' ? 'log-remove' : 'log-add';
+        logEntry.className = `log-entry ${colorClass}`;
+        
+        const timeStr = transaction.timestamp.toLocaleTimeString();
+        const dateStr = transaction.timestamp.toLocaleDateString();
+        // Reverse signs: add = negative (putting money in), remove = positive (returning money)
+        const sign = transaction.type === 'add' ? '-' : '+';
+        const typeText = transaction.type === 'add' ? 'added' : 'removed';
+        
+        logEntry.innerHTML = `
+            <div class="log-time">${dateStr} ${timeStr}</div>
+            <div class="log-details">
+                <span class="log-person">${transaction.personName}</span>
+                <span class="log-action">${typeText}</span>
+                <span class="log-amount">${sign}$${transaction.amount.toFixed(2)}</span>
+            </div>
+        `;
+        
+        logEntriesDiv.appendChild(logEntry);
+    });
+}
+
+// Make functions globally accessible
+window.showAddForm = showAddForm;
+window.showSubtractForm = showSubtractForm;
+window.hideForm = hideForm;
+window.submitAdd = submitAdd;
+window.submitSubtract = submitSubtract;
+window.updatePersonName = updatePersonName;
+window.updatePersonMoney = updatePersonMoney;
+window.resetData = resetData;
+window.showAddPersonForm = showAddPersonForm;
+window.hideAddPersonForm = hideAddPersonForm;
+window.submitAddPerson = submitAddPerson;
+window.togglePersonalLog = togglePersonalLog;
+
+// Initialize on page load
+loadState();
