@@ -28,6 +28,7 @@ const peopleWidgetsDiv = document.getElementById('people-widgets');
 const totalPotAmount = document.getElementById('total-pot-amount');
 const chipValueDisplay = document.getElementById('chip-value-display');
 const totalChipsAmount = document.getElementById('total-chips-amount');
+const chipsWarning = document.getElementById('chips-warning');
 const logEntriesDiv = document.getElementById('log-entries');
 
 // Initialize
@@ -673,6 +674,14 @@ function updateTotalPot() {
 function updateTotalChips() {
     const total = state.people.reduce((sum, person) => sum + (person.chips || 0), 0);
     totalChipsAmount.textContent = total;
+    
+    // Check if total chips is negative and show warning
+    if (total < 0) {
+        chipsWarning.textContent = 'Warning: Total chips balance is negative. Please check transactions.';
+        chipsWarning.classList.remove('hidden');
+    } else {
+        chipsWarning.classList.add('hidden');
+    }
 }
 
 // Update chip value display
