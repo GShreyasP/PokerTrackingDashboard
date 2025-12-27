@@ -862,9 +862,12 @@ function showPlayerToPlayerSettlement() {
         balance: (person.moneyReturned || 0) - (person.moneyPutIn || 0)
     }));
     
-    // Separate winners and losers
+    // Separate winners and losers, sorted by absolute value (biggest first)
     const winners = balances.filter(p => p.balance > 0).sort((a, b) => b.balance - a.balance);
-    const losers = balances.filter(p => p.balance < 0).sort((a, b) => a.balance - b.balance);
+    const losers = balances.filter(p => p.balance < 0).map(p => ({
+        ...p,
+        loss: Math.abs(p.balance)
+    })).sort((a, b) => b.loss - a.loss);
     
     if (winners.length === 0 && losers.length === 0) {
         resultsDiv.innerHTML = '<p>All players are even. No settlement needed.</p>';
@@ -873,7 +876,7 @@ function showPlayerToPlayerSettlement() {
     
     // Calculate total winnings and losses
     const totalWinnings = winners.reduce((sum, p) => sum + p.balance, 0);
-    const totalLosses = Math.abs(losers.reduce((sum, p) => sum + p.balance, 0));
+    const totalLosses = losers.reduce((sum, p) => sum + p.loss, 0);
     
     if (Math.abs(totalWinnings - totalLosses) > 0.01) {
         resultsDiv.innerHTML = '<p class="settlement-error">Warning: Winnings and losses do not balance. Please check transactions.</p>';
@@ -885,42 +888,57 @@ function showPlayerToPlayerSettlement() {
     instructionsDiv.innerHTML = '<h3>Settlement Instructions:</h3>';
     resultsDiv.appendChild(instructionsDiv);
     
-    // Match losers to winners
-    let winnerIndex = 0;
-    let remainingWinnerBalance = winners[0]?.balance || 0;
+    // Optimized matching: match biggest winner with biggest loser
+    // Create working copies to track remaining balances
+    const winnerBalances = winners.map(w => ({ ...w, remaining: w.balance }));
+    const loserBalances = losers.map(l => ({ ...l, remaining: l.loss }));
     
-    losers.forEach(loser => {
-        let remainingLoss = Math.abs(loser.balance);
-        const paymentsDiv = document.createElement('div');
-        paymentsDiv.className = 'settlement-payment-item';
+    // Track all payments to group by payer
+    const paymentsByPayer = {};
+    
+    // Match winners with losers, starting with biggest
+    for (let winnerIdx = 0; winnerIdx < winnerBalances.length; winnerIdx++) {
+        const winner = winnerBalances[winnerIdx];
         
-        const payments = [];
-        
-        while (remainingLoss > 0.01 && winnerIndex < winners.length) {
-            const payment = Math.min(remainingLoss, remainingWinnerBalance);
-            payments.push({
-                to: winners[winnerIndex].name,
-                amount: payment
-            });
+        // Find losers who still need to pay
+        for (let loserIdx = 0; loserIdx < loserBalances.length && winner.remaining > 0.01; loserIdx++) {
+            const loser = loserBalances[loserIdx];
             
-            remainingLoss -= payment;
-            remainingWinnerBalance -= payment;
-            
-            if (remainingWinnerBalance < 0.01) {
-                winnerIndex++;
-                remainingWinnerBalance = winners[winnerIndex]?.balance || 0;
+            if (loser.remaining > 0.01) {
+                // Calculate payment amount
+                const payment = Math.min(winner.remaining, loser.remaining);
+                
+                // Record payment
+                if (!paymentsByPayer[loser.name]) {
+                    paymentsByPayer[loser.name] = [];
+                }
+                paymentsByPayer[loser.name].push({
+                    to: winner.name,
+                    amount: payment
+                });
+                
+                // Update remaining balances
+                winner.remaining -= payment;
+                loser.remaining -= payment;
             }
         }
+    }
+    
+    // Display payments grouped by payer
+    Object.keys(paymentsByPayer).forEach(payerName => {
+        const payments = paymentsByPayer[payerName];
+        const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
         
-        if (payments.length > 0) {
-            paymentsDiv.innerHTML = `
-                <div class="payment-from">${loser.name} pays:</div>
-                <div class="payment-list">
-                    ${payments.map(p => `<div>$${p.amount.toFixed(2)} to ${p.to}</div>`).join('')}
-                </div>
-            `;
-            resultsDiv.appendChild(paymentsDiv);
-        }
+        const paymentsDiv = document.createElement('div');
+        paymentsDiv.className = 'settlement-payment-item';
+        paymentsDiv.innerHTML = `
+            <div class="payment-from">${payerName} pays:</div>
+            <div class="payment-list">
+                ${payments.map(p => `<div>$${p.amount.toFixed(2)} to ${p.to}</div>`).join('')}
+            </div>
+            <div class="payment-total">Total: $${totalAmount.toFixed(2)}</div>
+        `;
+        resultsDiv.appendChild(paymentsDiv);
     });
 }
 
