@@ -175,8 +175,21 @@ h3 {
 
 .header-actions {
     display: flex;
+    flex-direction: column;
     gap: 10px;
-    align-items: center;
+    align-items: stretch;
+}
+
+.btn-settlement {
+    background: #ffc107;
+    color: #333;
+    white-space: nowrap;
+    font-weight: bold;
+}
+
+.btn-settlement:hover {
+    background: #e0a800;
+    transform: translateY(-2px);
 }
 
 .btn-add-person {
@@ -544,6 +557,193 @@ h3 {
     color: #764ba2;
     font-weight: bold;
     font-size: 1.2em;
+}
+
+/* Settlement Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    max-width: 800px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    position: relative;
+}
+
+.modal-content h2 {
+    margin-top: 0;
+    color: #333;
+}
+
+.settlement-options {
+    text-align: center;
+}
+
+.settlement-options h2 {
+    margin-bottom: 30px;
+}
+
+.btn-settle-option {
+    display: block;
+    width: 100%;
+    margin-bottom: 15px;
+    padding: 15px;
+    font-size: 1.1em;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-settle-option:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.settlement-view {
+    margin-top: 20px;
+}
+
+.settlement-summary {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.settlement-summary h3 {
+    margin: 0;
+    color: #333;
+    font-size: 1.3em;
+}
+
+.settlement-person {
+    background: #f8f9fa;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    border: 2px solid #e0e0e0;
+}
+
+.settlement-person-name {
+    font-weight: bold;
+    font-size: 1.2em;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.settlement-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.settlement-details > div {
+    color: #666;
+}
+
+.settlement-payment {
+    font-size: 1.3em;
+    font-weight: bold;
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 6px;
+}
+
+.payment-positive {
+    color: #28a745;
+    background: #d4edda;
+}
+
+.payment-zero {
+    color: #6c757d;
+    background: #e9ecef;
+}
+
+.settlement-instructions {
+    background: #e7f3ff;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #667eea;
+}
+
+.settlement-instructions h3 {
+    margin: 0 0 10px 0;
+    color: #333;
+}
+
+.settlement-payment-item {
+    background: #fff3cd;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #ffc107;
+}
+
+.payment-from {
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.payment-list {
+    margin-left: 20px;
+}
+
+.payment-list > div {
+    padding: 5px 0;
+    color: #666;
+}
+
+.settlement-error {
+    background: #f8d7da;
+    color: #721c24;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #dc3545;
+    margin-bottom: 20px;
+}
+
+.btn-back {
+    background: #6c757d;
+    color: white;
+    margin-top: 20px;
+}
+
+.btn-back:hover {
+    background: #5a6268;
+}
+
+.btn-close-modal {
+    background: #667eea;
+    color: white;
+    width: 100%;
+    margin-top: 20px;
+    padding: 12px;
+}
+
+.btn-close-modal:hover {
+    background: #5568d3;
 }
 
 /* Personal Log Dropdown */

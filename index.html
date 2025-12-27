@@ -73,6 +73,7 @@
                     <div id="chip-value-display" class="chip-value-display"></div>
                 </div>
                 <div class="header-actions">
+                    <button id="settlement-btn" class="btn btn-settlement" onclick="showSettlementModal()">Settlement</button>
                     <button id="add-person-btn" class="btn btn-add-person" onclick="showAddPersonForm()">+ Add Person</button>
                     <button id="reset-btn" class="btn btn-reset" onclick="resetData()">Reset All Data</button>
                 </div>
@@ -87,6 +88,31 @@
             <div class="transaction-log">
                 <h2>Transaction Log</h2>
                 <div id="log-entries" class="log-entries"></div>
+            </div>
+        </div>
+        
+        <!-- Settlement Modal -->
+        <div id="settlement-modal" class="modal hidden">
+            <div class="modal-content">
+                <div id="settlement-options" class="settlement-options">
+                    <h2>Settlement Options</h2>
+                    <button class="btn btn-settle-option" onclick="showHouseSettlement()">House Settle</button>
+                    <button class="btn btn-settle-option" onclick="showPlayerToPlayerSettlement()">Player to Player Settlement</button>
+                </div>
+                
+                <div id="house-settlement-view" class="settlement-view hidden">
+                    <h2>House Settlement</h2>
+                    <div id="house-settlement-results"></div>
+                    <button class="btn btn-back" onclick="backToSettlementOptions()">Back</button>
+                </div>
+                
+                <div id="player-settlement-view" class="settlement-view hidden">
+                    <h2>Player to Player Settlement</h2>
+                    <div id="player-settlement-results"></div>
+                    <button class="btn btn-back" onclick="backToSettlementOptions()">Back</button>
+                </div>
+                
+                <button class="btn btn-close-modal" onclick="closeSettlementModal()">Back to Dashboard</button>
             </div>
         </div>
     </div>

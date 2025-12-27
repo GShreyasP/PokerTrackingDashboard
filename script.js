@@ -782,6 +782,143 @@ function renderLog() {
     });
 }
 
+// Settlement functions
+function showSettlementModal() {
+    const modal = document.getElementById('settlement-modal');
+    modal.classList.remove('hidden');
+    showSettlementOptions();
+}
+
+function closeSettlementModal() {
+    const modal = document.getElementById('settlement-modal');
+    modal.classList.add('hidden');
+}
+
+function showSettlementOptions() {
+    document.getElementById('settlement-options').classList.remove('hidden');
+    document.getElementById('house-settlement-view').classList.add('hidden');
+    document.getElementById('player-settlement-view').classList.add('hidden');
+}
+
+function showHouseSettlement() {
+    document.getElementById('settlement-options').classList.add('hidden');
+    document.getElementById('house-settlement-view').classList.remove('hidden');
+    
+    const resultsDiv = document.getElementById('house-settlement-results');
+    resultsDiv.innerHTML = '';
+    
+    // Calculate house settlement for each player
+    const totalCollected = state.people.reduce((sum, person) => sum + (person.moneyPutIn || 0), 0);
+    
+    const summaryDiv = document.createElement('div');
+    summaryDiv.className = 'settlement-summary';
+    summaryDiv.innerHTML = `<h3>Total Collected by House: $${totalCollected.toFixed(2)}</h3>`;
+    resultsDiv.appendChild(summaryDiv);
+    
+    state.people.forEach(person => {
+        const buyIn = person.moneyPutIn || 0;
+        const balance = (person.moneyReturned || 0) - buyIn;
+        // House pays: buyIn + balance
+        // If balance is positive (profit): buyIn + profit
+        // If balance is negative (loss): buyIn - loss (minimum 0)
+        const housePays = Math.max(0, buyIn + balance);
+        
+        const personDiv = document.createElement('div');
+        personDiv.className = 'settlement-person';
+        personDiv.innerHTML = `
+            <div class="settlement-person-name">${person.name}</div>
+            <div class="settlement-details">
+                <div>Buy-in: $${buyIn.toFixed(2)}</div>
+                <div>Final Balance: ${balance >= 0 ? '+' : ''}$${balance.toFixed(2)}</div>
+                <div class="settlement-payment ${housePays > 0 ? 'payment-positive' : 'payment-zero'}">
+                    House Pays: $${housePays.toFixed(2)}
+                </div>
+            </div>
+        `;
+        resultsDiv.appendChild(personDiv);
+    });
+}
+
+function showPlayerToPlayerSettlement() {
+    document.getElementById('settlement-options').classList.add('hidden');
+    document.getElementById('player-settlement-view').classList.remove('hidden');
+    
+    const resultsDiv = document.getElementById('player-settlement-results');
+    resultsDiv.innerHTML = '';
+    
+    // Calculate balances
+    const balances = state.people.map(person => ({
+        id: person.id,
+        name: person.name,
+        balance: (person.moneyReturned || 0) - (person.moneyPutIn || 0)
+    }));
+    
+    // Separate winners and losers
+    const winners = balances.filter(p => p.balance > 0).sort((a, b) => b.balance - a.balance);
+    const losers = balances.filter(p => p.balance < 0).sort((a, b) => a.balance - b.balance);
+    
+    if (winners.length === 0 && losers.length === 0) {
+        resultsDiv.innerHTML = '<p>All players are even. No settlement needed.</p>';
+        return;
+    }
+    
+    // Calculate total winnings and losses
+    const totalWinnings = winners.reduce((sum, p) => sum + p.balance, 0);
+    const totalLosses = Math.abs(losers.reduce((sum, p) => sum + p.balance, 0));
+    
+    if (Math.abs(totalWinnings - totalLosses) > 0.01) {
+        resultsDiv.innerHTML = '<p class="settlement-error">Warning: Winnings and losses do not balance. Please check transactions.</p>';
+    }
+    
+    // Show settlement instructions
+    const instructionsDiv = document.createElement('div');
+    instructionsDiv.className = 'settlement-instructions';
+    instructionsDiv.innerHTML = '<h3>Settlement Instructions:</h3>';
+    resultsDiv.appendChild(instructionsDiv);
+    
+    // Match losers to winners
+    let winnerIndex = 0;
+    let remainingWinnerBalance = winners[0]?.balance || 0;
+    
+    losers.forEach(loser => {
+        let remainingLoss = Math.abs(loser.balance);
+        const paymentsDiv = document.createElement('div');
+        paymentsDiv.className = 'settlement-payment-item';
+        
+        const payments = [];
+        
+        while (remainingLoss > 0.01 && winnerIndex < winners.length) {
+            const payment = Math.min(remainingLoss, remainingWinnerBalance);
+            payments.push({
+                to: winners[winnerIndex].name,
+                amount: payment
+            });
+            
+            remainingLoss -= payment;
+            remainingWinnerBalance -= payment;
+            
+            if (remainingWinnerBalance < 0.01) {
+                winnerIndex++;
+                remainingWinnerBalance = winners[winnerIndex]?.balance || 0;
+            }
+        }
+        
+        if (payments.length > 0) {
+            paymentsDiv.innerHTML = `
+                <div class="payment-from">${loser.name} pays:</div>
+                <div class="payment-list">
+                    ${payments.map(p => `<div>$${p.amount.toFixed(2)} to ${p.to}</div>`).join('')}
+                </div>
+            `;
+            resultsDiv.appendChild(paymentsDiv);
+        }
+    });
+}
+
+function backToSettlementOptions() {
+    showSettlementOptions();
+}
+
 // Make functions globally accessible
 window.showAddForm = showAddForm;
 window.showSubtractForm = showSubtractForm;
@@ -795,6 +932,11 @@ window.showAddPersonForm = showAddPersonForm;
 window.hideAddPersonForm = hideAddPersonForm;
 window.submitAddPerson = submitAddPerson;
 window.togglePersonalLog = togglePersonalLog;
+window.showSettlementModal = showSettlementModal;
+window.closeSettlementModal = closeSettlementModal;
+window.showHouseSettlement = showHouseSettlement;
+window.showPlayerToPlayerSettlement = showPlayerToPlayerSettlement;
+window.backToSettlementOptions = backToSettlementOptions;
 
 // Initialize on page load
 loadState();
