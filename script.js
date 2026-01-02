@@ -325,9 +325,23 @@ async function signOut() {
 }
 
 // Reset all data
-function resetData() {
+async function resetData() {
     if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
+        // Clear localStorage
         localStorage.removeItem('pokerTrackerState');
+        
+        // Delete from Firestore if user is signed in
+        if (window.currentUser && window.firebaseDb && window.firebaseReady) {
+            try {
+                const userId = window.currentUser.uid;
+                const docRef = window.firebaseDb.collection('users').doc(userId);
+                await docRef.delete();
+            } catch (error) {
+                console.error('Error deleting from Firestore:', error);
+            }
+        }
+        
+        // Reset state
         state = {
             people: [],
             stackValue: 0,
@@ -343,8 +357,11 @@ function resetData() {
             },
             transactions: []
         };
+        
+        // Show setup section and hide tracking section
         setupSection.classList.remove('hidden');
         trackingSection.classList.add('hidden');
+        
         // Reset form inputs
         numPeopleInput.value = 4;
         stackValueInput.value = '';
