@@ -639,23 +639,23 @@ function showAddForm(personId) {
                 <div class="chip-inputs-grid">
                     <div class="chip-input-row">
                         <label>Black ($${state.chipValues.black.toFixed(2)}):</label>
-                        <input type="number" id="add-black-${personId}" min="0" step="1" value="0" class="form-input">
+                        <input type="number" id="add-black-${personId}" min="0" step="1" value="0" class="form-input" placeholder="0">
                     </div>
                     <div class="chip-input-row">
                         <label>White ($${state.chipValues.white.toFixed(2)}):</label>
-                        <input type="number" id="add-white-${personId}" min="0" step="1" value="0" class="form-input">
+                        <input type="number" id="add-white-${personId}" min="0" step="1" value="0" class="form-input" placeholder="0">
                     </div>
                     <div class="chip-input-row">
                         <label>Green ($${state.chipValues.green.toFixed(2)}):</label>
-                        <input type="number" id="add-green-${personId}" min="0" step="1" value="0" class="form-input">
+                        <input type="number" id="add-green-${personId}" min="0" step="1" value="0" class="form-input" placeholder="0">
                     </div>
                     <div class="chip-input-row">
                         <label>Red ($${state.chipValues.red.toFixed(2)}):</label>
-                        <input type="number" id="add-red-${personId}" min="0" step="1" value="0" class="form-input">
+                        <input type="number" id="add-red-${personId}" min="0" step="1" value="0" class="form-input" placeholder="0">
                     </div>
                     <div class="chip-input-row">
                         <label>Blue ($${state.chipValues.blue.toFixed(2)}):</label>
-                        <input type="number" id="add-blue-${personId}" min="0" step="1" value="0" class="form-input">
+                        <input type="number" id="add-blue-${personId}" min="0" step="1" value="0" class="form-input" placeholder="0">
                     </div>
                 </div>
                 <div class="form-actions">
@@ -706,23 +706,23 @@ function showSubtractForm(personId) {
                 <div class="chip-inputs-grid">
                     <div class="chip-input-row">
                         <label>Black ($${state.chipValues.black.toFixed(2)}):</label>
-                        <input type="number" id="subtract-black-${personId}" min="0" step="1" value="0" class="form-input">
+                        <input type="number" id="subtract-black-${personId}" min="0" step="1" value="0" class="form-input" placeholder="0">
                     </div>
                     <div class="chip-input-row">
                         <label>White ($${state.chipValues.white.toFixed(2)}):</label>
-                        <input type="number" id="subtract-white-${personId}" min="0" step="1" value="0" class="form-input">
+                        <input type="number" id="subtract-white-${personId}" min="0" step="1" value="0" class="form-input" placeholder="0">
                     </div>
                     <div class="chip-input-row">
                         <label>Green ($${state.chipValues.green.toFixed(2)}):</label>
-                        <input type="number" id="subtract-green-${personId}" min="0" step="1" value="0" class="form-input">
+                        <input type="number" id="subtract-green-${personId}" min="0" step="1" value="0" class="form-input" placeholder="0">
                     </div>
                     <div class="chip-input-row">
                         <label>Red ($${state.chipValues.red.toFixed(2)}):</label>
-                        <input type="number" id="subtract-red-${personId}" min="0" step="1" value="0" class="form-input">
+                        <input type="number" id="subtract-red-${personId}" min="0" step="1" value="0" class="form-input" placeholder="0">
                     </div>
                     <div class="chip-input-row">
                         <label>Blue ($${state.chipValues.blue.toFixed(2)}):</label>
-                        <input type="number" id="subtract-blue-${personId}" min="0" step="1" value="0" class="form-input">
+                        <input type="number" id="subtract-blue-${personId}" min="0" step="1" value="0" class="form-input" placeholder="0">
                     </div>
                 </div>
                 <div class="form-actions">
