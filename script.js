@@ -242,7 +242,7 @@ async function sendPasswordReset() {
         const resetSuccess = document.getElementById('reset-success');
         if (resetError) resetError.classList.add('hidden');
         if (resetSuccess) {
-            resetSuccess.textContent = 'Password reset email sent! Check your inbox and follow the instructions to reset your password.';
+            resetSuccess.textContent = 'Password reset email sent! It should arrive within 1-2 minutes. Check your inbox (and spam folder) and follow the instructions to reset your password.';
             resetSuccess.classList.remove('hidden');
         }
     } catch (error) {
