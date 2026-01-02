@@ -15,9 +15,12 @@
     <div class="container">
         <div class="page-header">
             <h1>Poker Money Tracker</h1>
-            <div id="header-user-info" class="header-user-info hidden">
-                <span id="header-user-name"></span>
-                <button id="header-sign-out-btn" class="btn btn-sign-out" onclick="signOut()">Sign Out</button>
+            <div class="header-actions-right">
+                <button id="friends-btn" class="btn btn-friends hidden" onclick="toggleFriendsSidebar()">Friends</button>
+                <div id="header-user-info" class="header-user-info hidden">
+                    <span id="header-user-name"></span>
+                    <button id="header-sign-out-btn" class="btn btn-sign-out" onclick="signOut()">Sign Out</button>
+                </div>
             </div>
         </div>
         
@@ -206,6 +209,60 @@
                 <button class="btn btn-close-modal" onclick="closeSettlementModal()">Back to Dashboard</button>
             </div>
         </div>
+        
+        <!-- Friends Sidebar -->
+        <div id="friends-sidebar" class="friends-sidebar hidden">
+            <div class="friends-sidebar-header">
+                <h2>Friends</h2>
+                <button class="btn-close-sidebar" onclick="toggleFriendsSidebar()">×</button>
+            </div>
+            
+            <div class="friends-sidebar-content">
+                <!-- Add Friend Section -->
+                <div class="friends-add-section">
+                    <h3>Add Friend</h3>
+                    <div class="friends-search">
+                        <input type="text" id="friend-search-input" placeholder="Search by email or name" class="form-input">
+                        <button class="btn btn-primary btn-sm" onclick="searchFriend()">Search</button>
+                    </div>
+                    <div id="friend-search-results" class="friend-search-results hidden"></div>
+                    
+                    <div class="friends-invite-section">
+                        <h4>Or Invite by Link</h4>
+                        <div class="invite-link-container">
+                            <input type="text" id="invite-link-input" readonly value="https://poker-tracking-dashboard.vercel.app/" class="form-input">
+                            <button class="btn btn-primary btn-sm" onclick="copyInviteLink()">Copy Link</button>
+                        </div>
+                        <small>Share this link with friends to invite them</small>
+                    </div>
+                </div>
+                
+                <!-- Friend Requests Section -->
+                <div id="friend-requests-section" class="friends-section hidden">
+                    <h3>Friend Requests</h3>
+                    <div id="friend-requests-list" class="friends-list"></div>
+                </div>
+                
+                <!-- Online Friends Section -->
+                <div id="online-friends-section" class="friends-section">
+                    <h3>Online Friends</h3>
+                    <div id="online-friends-list" class="friends-list">
+                        <p class="no-friends">No online friends</p>
+                    </div>
+                </div>
+                
+                <!-- Offline Friends Section -->
+                <div id="offline-friends-section" class="friends-section">
+                    <h3>Offline Friends</h3>
+                    <div id="offline-friends-list" class="friends-list">
+                        <p class="no-friends">No offline friends</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Overlay for sidebar -->
+        <div id="sidebar-overlay" class="sidebar-overlay hidden" onclick="toggleFriendsSidebar()"></div>
     </div>
     
     <script src="/script.js"></script>

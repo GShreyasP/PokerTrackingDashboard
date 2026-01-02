@@ -374,6 +374,11 @@ async function signOut() {
     if (!window.firebaseAuth) return;
     
     try {
+        // Update online status before signing out
+        if (window.currentUser && window.updateOnlineStatus) {
+            await updateOnlineStatus(false);
+        }
+        
         await window.firebaseAuth.signOut();
         // Clear local state
         state = {
@@ -393,6 +398,16 @@ async function signOut() {
         };
         // Clear localStorage
         localStorage.removeItem('pokerTrackerState');
+        
+        // Hide friends button
+        hideFriendsButton();
+        
+        // Close friends sidebar if open
+        const sidebar = document.getElementById('friends-sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        if (sidebar) sidebar.classList.add('hidden');
+        if (overlay) overlay.classList.add('hidden');
+        
         // Auth state change will handle showing auth page
     } catch (error) {
         console.error('Sign-out error:', error);
@@ -1323,6 +1338,441 @@ function backToSettlementOptions() {
     showSettlementOptions();
 }
 
+// ==================== FRIENDS SYSTEM ====================
+
+let friendsListeners = [];
+let onlineStatusListeners = [];
+
+// Toggle friends sidebar
+function toggleFriendsSidebar() {
+    const sidebar = document.getElementById('friends-sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    
+    if (sidebar && overlay) {
+        const isHidden = sidebar.classList.contains('hidden');
+        if (isHidden) {
+            sidebar.classList.remove('hidden');
+            overlay.classList.remove('hidden');
+            loadFriendsList();
+            loadFriendRequests();
+        } else {
+            sidebar.classList.add('hidden');
+            overlay.classList.add('hidden');
+        }
+    }
+}
+
+// Show friends button when authenticated
+function showFriendsButton() {
+    const friendsBtn = document.getElementById('friends-btn');
+    if (friendsBtn) {
+        friendsBtn.classList.remove('hidden');
+    }
+}
+
+// Hide friends button when signed out
+function hideFriendsButton() {
+    const friendsBtn = document.getElementById('friends-btn');
+    if (friendsBtn) {
+        friendsBtn.classList.add('hidden');
+    }
+}
+
+// Search for friend by email or name
+async function searchFriend() {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const searchInput = document.getElementById('friend-search-input');
+    const searchTerm = searchInput.value.trim().toLowerCase();
+    const resultsDiv = document.getElementById('friend-search-results');
+    
+    if (!searchTerm) {
+        alert('Please enter an email or name to search');
+        return;
+    }
+    
+    try {
+        // Search users collection by email or displayName
+        const usersRef = window.firebaseDb.collection('users');
+        const snapshot = await usersRef.get();
+        
+        const results = [];
+        snapshot.forEach(doc => {
+            const userData = doc.data();
+            const userId = doc.id;
+            
+            // Skip current user
+            if (userId === window.currentUser.uid) return;
+            
+            const email = (userData.email || '').toLowerCase();
+            const name = (userData.displayName || '').toLowerCase();
+            
+            if (email.includes(searchTerm) || name.includes(searchTerm)) {
+                results.push({
+                    id: userId,
+                    email: userData.email || '',
+                    name: userData.displayName || userData.email || 'Unknown',
+                    ...userData
+                });
+            }
+        });
+        
+        if (results.length === 0) {
+            resultsDiv.innerHTML = '<p style="text-align: center; color: #666; padding: 10px;">No users found</p>';
+            resultsDiv.classList.remove('hidden');
+            return;
+        }
+        
+        // Display results
+        resultsDiv.innerHTML = results.map(user => `
+            <div class="friend-search-result">
+                <div class="friend-search-result-info">
+                    <div class="friend-search-result-name">${user.name}</div>
+                    <div class="friend-search-result-email">${user.email}</div>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="sendFriendRequest('${user.id}')">Add Friend</button>
+            </div>
+        `).join('');
+        
+        resultsDiv.classList.remove('hidden');
+    } catch (error) {
+        console.error('Error searching for friend:', error);
+        alert('Error searching for users. Please try again.');
+    }
+}
+
+// Send friend request
+async function sendFriendRequest(friendId) {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const currentUserId = window.currentUser.uid;
+    
+    // Check if already friends or request already sent
+    try {
+        const friendRequestsRef = window.firebaseDb.collection('friendRequests');
+        const existingRequest = await friendRequestsRef
+            .where('from', '==', currentUserId)
+            .where('to', '==', friendId)
+            .where('status', '==', 'pending')
+            .get();
+        
+        if (!existingRequest.empty) {
+            alert('Friend request already sent');
+            return;
+        }
+        
+        // Check if reverse request exists
+        const reverseRequest = await friendRequestsRef
+            .where('from', '==', friendId)
+            .where('to', '==', currentUserId)
+            .where('status', '==', 'pending')
+            .get();
+        
+        if (!reverseRequest.empty) {
+            alert('This user has already sent you a friend request. Check your friend requests.');
+            return;
+        }
+        
+        // Check if already friends
+        const friendsRef = window.firebaseDb.collection('friends');
+        const friendCheck1 = await friendsRef
+            .where('user1', '==', currentUserId)
+            .where('user2', '==', friendId)
+            .get();
+        const friendCheck2 = await friendsRef
+            .where('user1', '==', friendId)
+            .where('user2', '==', currentUserId)
+            .get();
+        
+        if (!friendCheck1.empty || !friendCheck2.empty) {
+            alert('You are already friends with this user');
+            return;
+        }
+        
+        // Create friend request
+        await friendRequestsRef.add({
+            from: currentUserId,
+            to: friendId,
+            status: 'pending',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        alert('Friend request sent!');
+        document.getElementById('friend-search-input').value = '';
+        document.getElementById('friend-search-results').classList.add('hidden');
+    } catch (error) {
+        console.error('Error sending friend request:', error);
+        alert('Error sending friend request. Please try again.');
+    }
+}
+
+// Load friend requests
+async function loadFriendRequests() {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const currentUserId = window.currentUser.uid;
+    const requestsList = document.getElementById('friend-requests-list');
+    const requestsSection = document.getElementById('friend-requests-section');
+    
+    try {
+        const friendRequestsRef = window.firebaseDb.collection('friendRequests');
+        const snapshot = await friendRequestsRef
+            .where('to', '==', currentUserId)
+            .where('status', '==', 'pending')
+            .get();
+        
+        if (snapshot.empty) {
+            requestsSection.classList.add('hidden');
+            return;
+        }
+        
+        requestsSection.classList.remove('hidden');
+        
+        const requests = [];
+        for (const doc of snapshot.docs) {
+            const requestData = doc.data();
+            const fromUserId = requestData.from;
+            
+            // Get user info
+            const userDoc = await window.firebaseDb.collection('users').doc(fromUserId).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                requests.push({
+                    id: doc.id,
+                    fromUserId: fromUserId,
+                    name: userData.displayName || userData.email || 'Unknown',
+                    email: userData.email || ''
+                });
+            }
+        }
+        
+        if (requests.length === 0) {
+            requestsSection.classList.add('hidden');
+            return;
+        }
+        
+        requestsList.innerHTML = requests.map(request => `
+            <div class="friend-request-item">
+                <div class="friend-search-result-info">
+                    <div class="friend-search-result-name">${request.name}</div>
+                    <div class="friend-search-result-email">${request.email}</div>
+                </div>
+                <div class="friend-request-actions">
+                    <button class="btn-accept" onclick="acceptFriendRequest('${request.id}', '${request.fromUserId}')">Accept</button>
+                    <button class="btn-decline" onclick="declineFriendRequest('${request.id}')">Decline</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading friend requests:', error);
+    }
+}
+
+// Accept friend request
+async function acceptFriendRequest(requestId, fromUserId) {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const currentUserId = window.currentUser.uid;
+    
+    try {
+        // Add to friends collection
+        const friendsRef = window.firebaseDb.collection('friends');
+        await friendsRef.add({
+            user1: currentUserId,
+            user2: fromUserId,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Update request status
+        const requestRef = window.firebaseDb.collection('friendRequests').doc(requestId);
+        await requestRef.update({ status: 'accepted' });
+        
+        // Reload friends list
+        loadFriendsList();
+        loadFriendRequests();
+    } catch (error) {
+        console.error('Error accepting friend request:', error);
+        alert('Error accepting friend request. Please try again.');
+    }
+}
+
+// Decline friend request
+async function declineFriendRequest(requestId) {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    try {
+        const requestRef = window.firebaseDb.collection('friendRequests').doc(requestId);
+        await requestRef.update({ status: 'declined' });
+        
+        loadFriendRequests();
+    } catch (error) {
+        console.error('Error declining friend request:', error);
+        alert('Error declining friend request. Please try again.');
+    }
+}
+
+// Load friends list
+async function loadFriendsList() {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const currentUserId = window.currentUser.uid;
+    const onlineList = document.getElementById('online-friends-list');
+    const offlineList = document.getElementById('offline-friends-list');
+    
+    // Clear existing listeners
+    friendsListeners.forEach(unsubscribe => unsubscribe());
+    friendsListeners = [];
+    onlineStatusListeners.forEach(unsubscribe => unsubscribe());
+    onlineStatusListeners = [];
+    
+    try {
+        const friendsRef = window.firebaseDb.collection('friends');
+        
+        // Get friends where user1 is current user
+        const snapshot1 = await friendsRef.where('user1', '==', currentUserId).get();
+        const snapshot2 = await friendsRef.where('user2', '==', currentUserId).get();
+        
+        const friendIds = new Set();
+        
+        snapshot1.forEach(doc => {
+            const data = doc.data();
+            friendIds.add(data.user2);
+        });
+        
+        snapshot2.forEach(doc => {
+            const data = doc.data();
+            friendIds.add(data.user1);
+        });
+        
+        if (friendIds.size === 0) {
+            onlineList.innerHTML = '<p class="no-friends">No online friends</p>';
+            offlineList.innerHTML = '<p class="no-friends">No offline friends</p>';
+            return;
+        }
+        
+        // Get friend user data and online status
+        const friends = [];
+        for (const friendId of friendIds) {
+            const userDoc = await window.firebaseDb.collection('users').doc(friendId).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                const onlineStatusDoc = await window.firebaseDb.collection('onlineStatus').doc(friendId).get();
+                const isOnline = onlineStatusDoc.exists && onlineStatusDoc.data().isOnline === true;
+                
+                friends.push({
+                    id: friendId,
+                    name: userData.displayName || userData.email || 'Unknown',
+                    email: userData.email || '',
+                    isOnline: isOnline
+                });
+            }
+        }
+        
+        // Separate online and offline
+        const onlineFriends = friends.filter(f => f.isOnline);
+        const offlineFriends = friends.filter(f => !f.isOnline);
+        
+        // Render online friends
+        if (onlineFriends.length === 0) {
+            onlineList.innerHTML = '<p class="no-friends">No online friends</p>';
+        } else {
+            onlineList.innerHTML = onlineFriends.map(friend => `
+                <div class="friend-item">
+                    <div class="friend-item-info">
+                        <div class="friend-item-avatar">${friend.name.charAt(0).toUpperCase()}</div>
+                        <div class="friend-item-details">
+                            <div class="friend-item-name">${friend.name}</div>
+                            <div class="friend-item-status online">Online</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Render offline friends
+        if (offlineFriends.length === 0) {
+            offlineList.innerHTML = '<p class="no-friends">No offline friends</p>';
+        } else {
+            offlineList.innerHTML = offlineFriends.map(friend => `
+                <div class="friend-item">
+                    <div class="friend-item-info">
+                        <div class="friend-item-avatar">${friend.name.charAt(0).toUpperCase()}</div>
+                        <div class="friend-item-details">
+                            <div class="friend-item-name">${friend.name}</div>
+                            <div class="friend-item-status offline">Offline</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Set up real-time listeners for online status
+        friendIds.forEach(friendId => {
+            const statusRef = window.firebaseDb.collection('onlineStatus').doc(friendId);
+            const unsubscribe = statusRef.onSnapshot((doc) => {
+                if (doc.exists) {
+                    const isOnline = doc.data().isOnline === true;
+                    updateFriendOnlineStatus(friendId, isOnline);
+                }
+            });
+            onlineStatusListeners.push(unsubscribe);
+        });
+    } catch (error) {
+        console.error('Error loading friends:', error);
+    }
+}
+
+// Update friend online status in UI
+function updateFriendOnlineStatus(friendId, isOnline) {
+    const onlineList = document.getElementById('online-friends-list');
+    const offlineList = document.getElementById('offline-friends-list');
+    
+    // Find and move friend between lists
+    const allItems = [...onlineList.querySelectorAll('.friend-item'), ...offlineList.querySelectorAll('.friend-item')];
+    allItems.forEach(item => {
+        if (item.dataset.friendId === friendId) {
+            item.remove();
+        }
+    });
+    
+    // Re-render friends list
+    loadFriendsList();
+}
+
+// Copy invite link
+function copyInviteLink() {
+    const inviteInput = document.getElementById('invite-link-input');
+    inviteInput.select();
+    inviteInput.setSelectionRange(0, 99999); // For mobile devices
+    
+    try {
+        document.execCommand('copy');
+        alert('Invite link copied to clipboard!');
+    } catch (err) {
+        // Fallback for modern browsers
+        navigator.clipboard.writeText(inviteInput.value).then(() => {
+            alert('Invite link copied to clipboard!');
+        }).catch(() => {
+            alert('Failed to copy link. Please copy manually.');
+        });
+    }
+}
+
+// Update online status when user signs in
+async function updateOnlineStatus(isOnline) {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    try {
+        const statusRef = window.firebaseDb.collection('onlineStatus').doc(window.currentUser.uid);
+        await statusRef.set({
+            isOnline: isOnline,
+            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+    } catch (error) {
+        console.error('Error updating online status:', error);
+    }
+}
+
 // Make functions globally accessible
 window.showAddForm = showAddForm;
 window.showSubtractForm = showSubtractForm;
@@ -1350,6 +1800,15 @@ window.showSignupForm = showSignupForm;
 window.showForgotPasswordForm = showForgotPasswordForm;
 window.backToLogin = backToLogin;
 window.sendPasswordReset = sendPasswordReset;
+window.toggleFriendsSidebar = toggleFriendsSidebar;
+window.searchFriend = searchFriend;
+window.sendFriendRequest = sendFriendRequest;
+window.acceptFriendRequest = acceptFriendRequest;
+window.declineFriendRequest = declineFriendRequest;
+window.copyInviteLink = copyInviteLink;
+window.updateOnlineStatus = updateOnlineStatus;
+window.showFriendsButton = showFriendsButton;
+window.hideFriendsButton = hideFriendsButton;
 window.loadState = loadState; // Make available for firebase-init.js
 
 // Initialize on page load

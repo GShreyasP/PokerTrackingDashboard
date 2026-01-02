@@ -23,11 +23,30 @@ async function initFirebase() {
         window.dispatchEvent(new Event('firebase-ready'));
         
         // Listen for auth state changes
-        window.firebaseAuth.onAuthStateChanged((user) => {
+        window.firebaseAuth.onAuthStateChanged(async (user) => {
             if (user) {
                 // User is signed in
                 window.currentUser = user;
                 showAuthenticatedView(user);
+                
+                // Update online status
+                if (window.updateOnlineStatus) {
+                    await window.updateOnlineStatus(true);
+                }
+                
+                // Save user profile to Firestore
+                const userRef = window.firebaseDb.collection('users').doc(user.uid);
+                await userRef.set({
+                    email: user.email,
+                    displayName: user.displayName || user.email,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                
+                // Show friends button
+                if (window.showFriendsButton) {
+                    window.showFriendsButton();
+                }
+                
                 if (typeof loadUserData === 'function') {
                     loadUserData(user.uid);
                 } else {
@@ -42,7 +61,18 @@ async function initFirebase() {
                 }
             } else {
                 // User is signed out
+                // Update online status
+                if (window.updateOnlineStatus && window.currentUser) {
+                    await window.updateOnlineStatus(false);
+                }
+                
                 window.currentUser = null;
+                
+                // Hide friends button
+                if (window.hideFriendsButton) {
+                    window.hideFriendsButton();
+                }
+                
                 showAuthPage();
             }
         });

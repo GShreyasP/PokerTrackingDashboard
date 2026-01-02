@@ -26,6 +26,12 @@ body {
     gap: 20px;
 }
 
+.header-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
 h1 {
     text-align: left;
     color: white;
