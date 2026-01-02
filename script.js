@@ -380,10 +380,55 @@ function toggleChipValueMode() {
 
 // Start tracking - go directly to dashboard
 function startTracking() {
+    // Validate all required fields
+    const numPeople = parseInt(numPeopleInput.value);
+    const stackValue = parseFloat(stackValueInput.value);
+    const chipsPerStack = parseInt(chipsPerStackInput.value);
+    const sameValue = sameValueToggle.checked;
+    
+    // Check if checkbox is checked
+    if (!sameValue) {
+        alert('Please check "All chips are worth the same" or configure individual chip values.');
+        return;
+    }
+    
+    // Validate required fields
+    if (!numPeople || numPeople < 1) {
+        alert('Please enter a valid number of people (at least 1).');
+        numPeopleInput.focus();
+        return;
+    }
+    
+    if (!stackValue || stackValue <= 0) {
+        alert('Please enter a valid stack value (greater than 0).');
+        stackValueInput.focus();
+        return;
+    }
+    
+    if (!chipsPerStack || chipsPerStack < 1) {
+        alert('Please enter a valid number of chips per stack (at least 1).');
+        chipsPerStackInput.focus();
+        return;
+    }
+    
+    // If different chip values, validate all chip values are filled
+    if (!sameValue) {
+        const black = parseFloat(document.getElementById('black-value').value) || 0;
+        const white = parseFloat(document.getElementById('white-value').value) || 0;
+        const green = parseFloat(document.getElementById('green-value').value) || 0;
+        const red = parseFloat(document.getElementById('red-value').value) || 0;
+        const blue = parseFloat(document.getElementById('blue-value').value) || 0;
+        
+        if (black === 0 && white === 0 && green === 0 && red === 0 && blue === 0) {
+            alert('Please enter values for at least one chip color.');
+            return;
+        }
+    }
+    
     // Save chip configuration
-    state.stackValue = parseFloat(stackValueInput.value) || 0;
-    state.chipsPerStack = parseInt(chipsPerStackInput.value) || 0;
-    state.sameValue = sameValueToggle.checked;
+    state.stackValue = stackValue;
+    state.chipsPerStack = chipsPerStack;
+    state.sameValue = sameValue;
     
     if (state.sameValue) {
         // Calculate $ per chip: stack value / chips per stack
@@ -396,9 +441,6 @@ function startTracking() {
         state.chipValues.red = parseFloat(document.getElementById('red-value').value) || 0;
         state.chipValues.blue = parseFloat(document.getElementById('blue-value').value) || 0;
     }
-    
-    // Get number of people and create person widgets with 1 stack each
-    const numPeople = parseInt(numPeopleInput.value) || 1;
     
     // Only create new people if we don't have any yet
     if (state.people.length === 0) {
