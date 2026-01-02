@@ -559,7 +559,7 @@ function renderPeopleWidgets() {
                 <input type="text" class="widget-name-input" value="${person.name}" 
                        onchange="updatePersonName(${person.id}, this.value)"
                        onblur="updatePersonName(${person.id}, this.value)"
-                       placeholder="Person Name">
+                       placeholder="Person ${person.id + 1}">
             </div>
             <div class="widget-balance ${balanceClass}">
                 <div class="balance-label">Balance</div>
@@ -622,7 +622,7 @@ function showAddForm(personId) {
                 <h4>Add Money for ${person.name}</h4>
                 <div class="form-row">
                     <label>Number of Stacks:</label>
-                    <input type="number" id="add-stacks-${personId}" min="0" step="0.1" value="0" class="form-input">
+                    <input type="number" id="add-stacks-${personId}" min="0" step="0.1" value="0" class="form-input" placeholder="1">
                     <small>You can enter partial stacks (e.g., 0.5)</small>
                 </div>
                 <div class="form-actions">
@@ -689,7 +689,7 @@ function showSubtractForm(personId) {
                 <h4>Return Chips for ${person.name}</h4>
                 <div class="form-row">
                     <label>Number of Chips to Return:</label>
-                    <input type="number" id="subtract-chips-${personId}" min="0" step="1" value="0" class="form-input">
+                    <input type="number" id="subtract-chips-${personId}" min="0" step="1" value="0" class="form-input" placeholder="20">
                     <small>You can return more chips than you have (from other players)</small>
                 </div>
                 <div class="form-actions">
