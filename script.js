@@ -452,7 +452,7 @@ function startTracking() {
             
             state.people.push({
                 id: i,
-                name: `Person ${i + 1}`,
+                name: '', // Start with empty name so placeholder shows
                 totalMoney: initialMoney,
                 initialMoney: initialMoney,
                 moneyPutIn: initialMoney, // Track money put into pot
@@ -460,9 +460,10 @@ function startTracking() {
                 chips: initialChips
             });
             
-            // Add initial transaction
+            // Add initial transaction (use placeholder name if name is empty)
             if (initialMoney > 0) {
-                addTransaction(i, state.people[i].name, initialMoney, 'add');
+                const displayName = state.people[i].name || `Person ${i + 1}`;
+                addTransaction(i, displayName, initialMoney, 'add');
             }
         }
     }
@@ -568,7 +569,8 @@ function submitAddPerson() {
     
     // Add transaction if money > 0
     if (money > 0) {
-        addTransaction(newPerson.id, newPerson.name, money, 'add');
+        const displayName = newPerson.name || `Person ${newPerson.id + 1}`;
+        addTransaction(newPerson.id, displayName, money, 'add');
     }
     
     hideAddPersonForm();
@@ -823,7 +825,8 @@ function submitAdd(personId) {
         // Update total money (for display purposes, though we use balance now)
         person.totalMoney = (person.totalMoney || 0) + amount;
         
-        addTransaction(personId, person.name, amount, 'add');
+        const displayName = person.name || `Person ${personId + 1}`;
+        addTransaction(personId, displayName, amount, 'add');
         hideForm(personId);
         renderPeopleWidgets();
         updateTotalPot();
@@ -888,7 +891,8 @@ function submitSubtract(personId) {
         // Update total money (for display purposes, though we use balance now)
         person.totalMoney = (person.totalMoney || 0) - amount;
         
-        addTransaction(personId, person.name, amount, 'remove');
+        const displayName = person.name || `Person ${personId + 1}`;
+        addTransaction(personId, displayName, amount, 'remove');
         hideForm(personId);
         renderPeopleWidgets();
         updateTotalPot();
