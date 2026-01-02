@@ -598,7 +598,7 @@ function renderPeopleWidgets() {
         widget.id = `widget-${person.id}`;
         widget.innerHTML = `
             <div class="widget-header">
-                <input type="text" class="widget-name-input" value="${person.name}" 
+                <input type="text" class="widget-name-input" value="${person.name || ''}" 
                        onchange="updatePersonName(${person.id}, this.value)"
                        onblur="updatePersonName(${person.id}, this.value)"
                        placeholder="Person ${person.id + 1}">
