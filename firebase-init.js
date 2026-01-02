@@ -63,10 +63,12 @@ function showAuthPage() {
     const authPage = document.getElementById('auth-page');
     const setupSection = document.getElementById('setup-section');
     const trackingSection = document.getElementById('tracking-section');
+    const headerUserInfo = document.getElementById('header-user-info');
     
     if (authPage) authPage.classList.remove('hidden');
     if (setupSection) setupSection.classList.add('hidden');
     if (trackingSection) trackingSection.classList.add('hidden');
+    if (headerUserInfo) headerUserInfo.classList.add('hidden');
 }
 
 // Show authenticated view (setup or tracking)
@@ -74,11 +76,20 @@ function showAuthenticatedView(user) {
     const authPage = document.getElementById('auth-page');
     const userInfo = document.getElementById('user-info');
     const userName = document.getElementById('user-name');
+    const headerUserInfo = document.getElementById('header-user-info');
+    const headerUserName = document.getElementById('header-user-name');
     
     if (authPage) authPage.classList.add('hidden');
     
+    // Update user info in tracking section (if exists)
     if (userInfo && userName) {
         userName.textContent = user.displayName || user.email;
+    }
+    
+    // Update user info in header (always visible)
+    if (headerUserInfo && headerUserName) {
+        headerUserName.textContent = user.displayName || user.email;
+        headerUserInfo.classList.remove('hidden');
     }
     
     // Setup section and tracking section visibility will be handled by loadUserData

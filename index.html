@@ -13,7 +13,13 @@
 </head>
 <body>
     <div class="container">
-        <h1>Poker Money Tracker</h1>
+        <div class="page-header">
+            <h1>Poker Money Tracker</h1>
+            <div id="header-user-info" class="header-user-info hidden">
+                <span id="header-user-name"></span>
+                <button id="header-sign-out-btn" class="btn btn-sign-out" onclick="signOut()">Sign Out</button>
+            </div>
+        </div>
         
         <!-- Authentication Section (shown first) -->
         <div id="auth-page" class="auth-page">
