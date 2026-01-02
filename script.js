@@ -42,10 +42,12 @@ function loadState() {
         try {
             const parsed = JSON.parse(savedState);
             restoreState(parsed);
+            return true; // Data was loaded
         } catch (e) {
             console.error('Error loading state:', e);
         }
     }
+    return false; // No data was loaded
 }
 
 // Restore state from parsed data
@@ -101,18 +103,33 @@ async function loadUserData(userId) {
         const docRef = window.firebaseDb.collection('users').doc(userId);
         const doc = await docRef.get();
         
-        if (doc.exists) {
+        if (doc.exists && doc.data().state) {
             const data = doc.data();
             restoreState(data.state);
         } else {
             // No data in Firestore, try localStorage
-            loadState();
+            const hasLocalData = loadState();
+            // If no local data either, show setup section
+            if (!hasLocalData) {
+                showSetupSection();
+            }
         }
     } catch (error) {
         console.error('Error loading user data:', error);
         // Fall back to localStorage
-        loadState();
+        const hasLocalData = loadState();
+        if (!hasLocalData) {
+            showSetupSection();
+        }
     }
+}
+
+// Show setup section
+function showSetupSection() {
+    const setupSection = document.getElementById('setup-section');
+    const trackingSection = document.getElementById('tracking-section');
+    if (setupSection) setupSection.classList.remove('hidden');
+    if (trackingSection) trackingSection.classList.add('hidden');
 }
 
 // Save state to Firestore (if signed in) or localStorage (fallback)
