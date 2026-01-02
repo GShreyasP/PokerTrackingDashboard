@@ -5,10 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Poker Money Tracker</title>
     <link rel="stylesheet" href="/style.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="/firebase-init.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>Poker Money Tracker</h1>
+        <div class="auth-header">
+            <h1>Poker Money Tracker</h1>
+            <div id="auth-section" class="auth-section">
+                <div id="user-info" class="user-info hidden">
+                    <span id="user-name"></span>
+                    <button id="sign-out-btn" class="btn btn-sign-out" onclick="signOut()">Sign Out</button>
+                </div>
+                <button id="sign-in-btn" class="btn btn-sign-in hidden" onclick="signInWithGoogle()">Sign in with Google</button>
+            </div>
+        </div>
         
         <!-- Initial Setup Section -->
         <div id="setup-section" class="setup-section">

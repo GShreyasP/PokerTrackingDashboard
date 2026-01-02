@@ -35,53 +35,157 @@ const logEntriesDiv = document.getElementById('log-entries');
 sameValueToggle.addEventListener('change', toggleChipValueMode);
 setupBtn.addEventListener('click', startTracking);
 
-// Load state from localStorage on page load
+// Load state from localStorage (fallback) or Firestore
 function loadState() {
     const savedState = localStorage.getItem('pokerTrackerState');
     if (savedState) {
         try {
             const parsed = JSON.parse(savedState);
-            // Restore state
-            Object.assign(state, parsed);
-            
-            // Convert timestamp strings back to Date objects
-            state.transactions.forEach(t => {
-                t.timestamp = new Date(t.timestamp);
-            });
-            
-            // Migrate old data: ensure all people have moneyPutIn and moneyReturned
-            state.people.forEach(person => {
-                if (person.moneyPutIn === undefined) {
-                    // For old data, use initialMoney or totalMoney as moneyPutIn
-                    person.moneyPutIn = person.initialMoney || person.totalMoney || 0;
-                }
-                if (person.moneyReturned === undefined) {
-                    person.moneyReturned = 0;
-                }
-            });
-            
-            // If we have people, show tracking section
-            if (state.people.length > 0) {
-                setupSection.classList.add('hidden');
-                trackingSection.classList.remove('hidden');
-                renderPeopleWidgets();
-                updateTotalPot();
-                updateChipValueDisplay();
-                updateTotalChips();
-                renderLog();
-            }
+            restoreState(parsed);
         } catch (e) {
             console.error('Error loading state:', e);
         }
     }
 }
 
-// Save state to localStorage
-function saveState() {
+// Restore state from parsed data
+function restoreState(parsed) {
+    // Restore state
+    Object.assign(state, parsed);
+    
+    // Convert timestamp strings back to Date objects
+    if (state.transactions) {
+        state.transactions.forEach(t => {
+            t.timestamp = new Date(t.timestamp);
+        });
+    }
+    
+    // Migrate old data: ensure all people have moneyPutIn and moneyReturned
+    if (state.people) {
+        state.people.forEach(person => {
+            if (person.moneyPutIn === undefined) {
+                // For old data, use initialMoney or totalMoney as moneyPutIn
+                person.moneyPutIn = person.initialMoney || person.totalMoney || 0;
+            }
+            if (person.moneyReturned === undefined) {
+                person.moneyReturned = 0;
+            }
+        });
+    }
+    
+    // If we have people, show tracking section
+    if (state.people && state.people.length > 0) {
+        setupSection.classList.add('hidden');
+        trackingSection.classList.remove('hidden');
+        renderPeopleWidgets();
+        updateTotalPot();
+        updateChipValueDisplay();
+        updateTotalChips();
+        renderLog();
+    }
+}
+
+// Load user data from Firestore
+async function loadUserData(userId) {
+    if (!window.firebaseDb || !window.firebaseReady) {
+        // Firebase not ready, use localStorage
+        loadState();
+        return;
+    }
+    
     try {
-        localStorage.setItem('pokerTrackerState', JSON.stringify(state));
-    } catch (e) {
-        console.error('Error saving state:', e);
+        const docRef = window.firebaseDb.collection('users').doc(userId);
+        const doc = await docRef.get();
+        
+        if (doc.exists) {
+            const data = doc.data();
+            restoreState(data.state);
+        } else {
+            // No data in Firestore, try localStorage
+            loadState();
+        }
+    } catch (error) {
+        console.error('Error loading user data:', error);
+        // Fall back to localStorage
+        loadState();
+    }
+}
+
+// Save state to Firestore (if signed in) or localStorage (fallback)
+async function saveState() {
+    // If user is signed in, save to Firestore
+    if (window.currentUser && window.firebaseDb && window.firebaseReady) {
+        try {
+            const userId = window.currentUser.uid;
+            const docRef = window.firebaseDb.collection('users').doc(userId);
+            await docRef.set({
+                state: state,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } catch (error) {
+            console.error('Error saving to Firestore:', error);
+            // Fall back to localStorage
+            try {
+                localStorage.setItem('pokerTrackerState', JSON.stringify(state));
+            } catch (e) {
+                console.error('Error saving to localStorage:', e);
+            }
+        }
+    } else {
+        // Not signed in, use localStorage
+        try {
+            localStorage.setItem('pokerTrackerState', JSON.stringify(state));
+        } catch (e) {
+            console.error('Error saving state:', e);
+        }
+    }
+}
+
+// Sign in with Google
+async function signInWithGoogle() {
+    if (!window.firebaseAuth || !window.firebaseReady) {
+        alert('Firebase is not ready. Please refresh the page.');
+        return;
+    }
+    
+    const provider = new firebase.auth.GoogleAuthProvider();
+    try {
+        await window.firebaseAuth.signInWithPopup(provider);
+    } catch (error) {
+        console.error('Sign-in error:', error);
+        alert('Error signing in: ' + error.message);
+    }
+}
+
+// Sign out
+async function signOut() {
+    if (!window.firebaseAuth) return;
+    
+    try {
+        await window.firebaseAuth.signOut();
+        // Clear local state
+        state = {
+            people: [],
+            stackValue: 0,
+            chipsPerStack: 0,
+            sameValue: true,
+            chipValue: 0,
+            chipValues: {
+                black: 0,
+                white: 0,
+                green: 0,
+                red: 0,
+                blue: 0
+            },
+            transactions: []
+        };
+        // Reset UI
+        setupSection.classList.remove('hidden');
+        trackingSection.classList.add('hidden');
+        // Clear localStorage
+        localStorage.removeItem('pokerTrackerState');
+    } catch (error) {
+        console.error('Sign-out error:', error);
     }
 }
 
@@ -964,6 +1068,23 @@ window.closeSettlementModal = closeSettlementModal;
 window.showHouseSettlement = showHouseSettlement;
 window.showPlayerToPlayerSettlement = showPlayerToPlayerSettlement;
 window.backToSettlementOptions = backToSettlementOptions;
+window.signInWithGoogle = signInWithGoogle;
+window.signOut = signOut;
+window.loadState = loadState; // Make available for firebase-init.js
 
-// Initialize on page load
-loadState();
+// Initialize on page load (will be overridden by Firebase auth if signed in)
+// Wait for Firebase to be ready, then load state
+window.addEventListener('firebase-ready', () => {
+    // Firebase will handle loading via auth state change
+    // But if not signed in, load from localStorage
+    if (!window.currentUser) {
+        loadState();
+    }
+});
+
+// If Firebase doesn't load, use localStorage
+setTimeout(() => {
+    if (!window.firebaseReady) {
+        loadState();
+    }
+}, 1000);
