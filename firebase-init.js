@@ -27,7 +27,7 @@ async function initFirebase() {
             if (user) {
                 // User is signed in
                 window.currentUser = user;
-                updateAuthUI(user);
+                showAuthenticatedView(user);
                 if (typeof loadUserData === 'function') {
                     loadUserData(user.uid);
                 } else {
@@ -43,13 +43,7 @@ async function initFirebase() {
             } else {
                 // User is signed out
                 window.currentUser = null;
-                updateAuthUI(null);
-                // Fall back to localStorage if not signed in
-                if (typeof loadState === 'function') {
-                    loadState();
-                } else if (window.loadState) {
-                    window.loadState();
-                }
+                showAuthPage();
             }
         });
     } catch (error) {
@@ -64,20 +58,30 @@ async function initFirebase() {
     }
 }
 
-// Update auth UI
-function updateAuthUI(user) {
+// Show authentication page
+function showAuthPage() {
+    const authPage = document.getElementById('auth-page');
+    const setupSection = document.getElementById('setup-section');
+    const trackingSection = document.getElementById('tracking-section');
+    
+    if (authPage) authPage.classList.remove('hidden');
+    if (setupSection) setupSection.classList.add('hidden');
+    if (trackingSection) trackingSection.classList.add('hidden');
+}
+
+// Show authenticated view (setup or tracking)
+function showAuthenticatedView(user) {
+    const authPage = document.getElementById('auth-page');
     const userInfo = document.getElementById('user-info');
     const userName = document.getElementById('user-name');
-    const signInBtn = document.getElementById('sign-in-btn');
     
-    if (user && userInfo && userName && signInBtn) {
+    if (authPage) authPage.classList.add('hidden');
+    
+    if (userInfo && userName) {
         userName.textContent = user.displayName || user.email;
-        userInfo.classList.remove('hidden');
-        signInBtn.classList.add('hidden');
-    } else if (userInfo && signInBtn) {
-        userInfo.classList.add('hidden');
-        signInBtn.classList.remove('hidden');
     }
+    
+    // Setup section and tracking section visibility will be handled by loadUserData
 }
 
 // Initialize when page loads

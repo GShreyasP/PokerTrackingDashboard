@@ -82,6 +82,10 @@ function restoreState(parsed) {
         updateChipValueDisplay();
         updateTotalChips();
         renderLog();
+    } else {
+        // No data, show setup section
+        setupSection.classList.remove('hidden');
+        trackingSection.classList.add('hidden');
     }
 }
 
@@ -141,6 +145,121 @@ async function saveState() {
     }
 }
 
+// Show login form
+function showLoginForm() {
+    document.getElementById('login-form').classList.remove('hidden');
+    document.getElementById('signup-form').classList.add('hidden');
+    document.querySelectorAll('.auth-tab').forEach(tab => tab.classList.remove('active'));
+    event.target.classList.add('active');
+    clearAuthErrors();
+}
+
+// Show signup form
+function showSignupForm() {
+    document.getElementById('signup-form').classList.remove('hidden');
+    document.getElementById('login-form').classList.add('hidden');
+    document.querySelectorAll('.auth-tab').forEach(tab => tab.classList.remove('active'));
+    event.target.classList.add('active');
+    clearAuthErrors();
+}
+
+// Clear auth error messages
+function clearAuthErrors() {
+    document.getElementById('login-error').classList.add('hidden');
+    document.getElementById('signup-error').classList.add('hidden');
+}
+
+// Login with email and password
+async function loginWithEmail() {
+    if (!window.firebaseAuth || !window.firebaseReady) {
+        showError('login-error', 'Firebase is not ready. Please refresh the page.');
+        return;
+    }
+    
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    
+    if (!email || !password) {
+        showError('login-error', 'Please enter both email and password.');
+        return;
+    }
+    
+    try {
+        await window.firebaseAuth.signInWithEmailAndPassword(email, password);
+        // Auth state change will handle UI update
+    } catch (error) {
+        console.error('Login error:', error);
+        let errorMessage = 'Error signing in. ';
+        if (error.code === 'auth/user-not-found') {
+            errorMessage += 'No account found with this email.';
+        } else if (error.code === 'auth/wrong-password') {
+            errorMessage += 'Incorrect password.';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage += 'Invalid email address.';
+        } else {
+            errorMessage += error.message;
+        }
+        showError('login-error', errorMessage);
+    }
+}
+
+// Signup with email and password
+async function signupWithEmail() {
+    if (!window.firebaseAuth || !window.firebaseReady) {
+        showError('signup-error', 'Firebase is not ready. Please refresh the page.');
+        return;
+    }
+    
+    const email = document.getElementById('signup-email').value.trim();
+    const password = document.getElementById('signup-password').value;
+    const name = document.getElementById('signup-name').value.trim();
+    
+    if (!email || !password) {
+        showError('signup-error', 'Please enter both email and password.');
+        return;
+    }
+    
+    if (password.length < 6) {
+        showError('signup-error', 'Password must be at least 6 characters.');
+        return;
+    }
+    
+    try {
+        const userCredential = await window.firebaseAuth.createUserWithEmailAndPassword(email, password);
+        
+        // Update display name if provided
+        if (name && userCredential.user) {
+            await userCredential.user.updateProfile({
+                displayName: name
+            });
+        }
+        
+        // Auth state change will handle UI update
+    } catch (error) {
+        console.error('Signup error:', error);
+        let errorMessage = 'Error creating account. ';
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage += 'An account with this email already exists.';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage += 'Invalid email address.';
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage += 'Password is too weak.';
+        } else {
+            errorMessage += error.message;
+        }
+        showError('signup-error', errorMessage);
+    }
+}
+
+// Show error message
+function showError(errorId, message) {
+    const errorDiv = document.getElementById(errorId);
+    if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.classList.remove('hidden');
+    }
+}
+
 // Sign in with Google
 async function signInWithGoogle() {
     if (!window.firebaseAuth || !window.firebaseReady) {
@@ -151,6 +270,7 @@ async function signInWithGoogle() {
     const provider = new firebase.auth.GoogleAuthProvider();
     try {
         await window.firebaseAuth.signInWithPopup(provider);
+        // Auth state change will handle UI update
     } catch (error) {
         console.error('Sign-in error:', error);
         alert('Error signing in: ' + error.message);
@@ -179,11 +299,9 @@ async function signOut() {
             },
             transactions: []
         };
-        // Reset UI
-        setupSection.classList.remove('hidden');
-        trackingSection.classList.add('hidden');
         // Clear localStorage
         localStorage.removeItem('pokerTrackerState');
+        // Auth state change will handle showing auth page
     } catch (error) {
         console.error('Sign-out error:', error);
     }
@@ -1070,21 +1188,21 @@ window.showPlayerToPlayerSettlement = showPlayerToPlayerSettlement;
 window.backToSettlementOptions = backToSettlementOptions;
 window.signInWithGoogle = signInWithGoogle;
 window.signOut = signOut;
+window.loginWithEmail = loginWithEmail;
+window.signupWithEmail = signupWithEmail;
+window.showLoginForm = showLoginForm;
+window.showSignupForm = showSignupForm;
 window.loadState = loadState; // Make available for firebase-init.js
 
-// Initialize on page load (will be overridden by Firebase auth if signed in)
-// Wait for Firebase to be ready, then load state
-window.addEventListener('firebase-ready', () => {
-    // Firebase will handle loading via auth state change
-    // But if not signed in, load from localStorage
-    if (!window.currentUser) {
-        loadState();
-    }
-});
-
-// If Firebase doesn't load, use localStorage
+// Initialize on page load
+// Firebase auth state change will handle showing auth page or authenticated content
+// If Firebase doesn't load, show auth page after timeout
 setTimeout(() => {
     if (!window.firebaseReady) {
-        loadState();
+        // Firebase failed to load, show auth page
+        const authPage = document.getElementById('auth-page');
+        const setupSection = document.getElementById('setup-section');
+        if (authPage) authPage.classList.remove('hidden');
+        if (setupSection) setupSection.classList.add('hidden');
     }
 }, 1000);
