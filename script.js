@@ -1741,20 +1741,27 @@ function updateFriendOnlineStatus(friendId, isOnline) {
 
 // Copy invite link
 function copyInviteLink() {
-    const inviteInput = document.getElementById('invite-link-input');
-    inviteInput.select();
-    inviteInput.setSelectionRange(0, 99999); // For mobile devices
+    const inviteLinkText = document.getElementById('invite-link-text');
+    const linkText = inviteLinkText ? inviteLinkText.textContent : 'https://poker-tracking-dashboard.vercel.app/';
     
     try {
-        document.execCommand('copy');
-        alert('Invite link copied to clipboard!');
-    } catch (err) {
-        // Fallback for modern browsers
-        navigator.clipboard.writeText(inviteInput.value).then(() => {
+        // Modern clipboard API
+        navigator.clipboard.writeText(linkText).then(() => {
             alert('Invite link copied to clipboard!');
         }).catch(() => {
-            alert('Failed to copy link. Please copy manually.');
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = linkText;
+            textArea.style.position = 'fixed';
+            textArea.style.opacity = '0';
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            alert('Invite link copied to clipboard!');
         });
+    } catch (err) {
+        alert('Failed to copy link. Please copy manually: ' + linkText);
     }
 }
 
