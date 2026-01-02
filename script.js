@@ -166,6 +166,8 @@ async function saveState() {
 function showLoginForm() {
     document.getElementById('login-form').classList.remove('hidden');
     document.getElementById('signup-form').classList.add('hidden');
+    const forgotPasswordForm = document.getElementById('forgot-password-form');
+    if (forgotPasswordForm) forgotPasswordForm.classList.add('hidden');
     document.querySelectorAll('.auth-tab').forEach(tab => tab.classList.remove('active'));
     event.target.classList.add('active');
     clearAuthErrors();
@@ -184,6 +186,79 @@ function showSignupForm() {
 function clearAuthErrors() {
     document.getElementById('login-error').classList.add('hidden');
     document.getElementById('signup-error').classList.add('hidden');
+    const resetError = document.getElementById('reset-error');
+    const resetSuccess = document.getElementById('reset-success');
+    if (resetError) resetError.classList.add('hidden');
+    if (resetSuccess) resetSuccess.classList.add('hidden');
+}
+
+// Show forgot password form
+function showForgotPasswordForm() {
+    const loginForm = document.getElementById('login-form');
+    const forgotPasswordForm = document.getElementById('forgot-password-form');
+    const resetEmail = document.getElementById('reset-email');
+    const loginEmail = document.getElementById('login-email');
+    
+    if (loginForm) loginForm.classList.add('hidden');
+    if (forgotPasswordForm) forgotPasswordForm.classList.remove('hidden');
+    
+    // Pre-fill email if user already entered it
+    if (resetEmail && loginEmail && loginEmail.value) {
+        resetEmail.value = loginEmail.value;
+    }
+    
+    clearAuthErrors();
+}
+
+// Back to login form
+function backToLogin() {
+    const loginForm = document.getElementById('login-form');
+    const forgotPasswordForm = document.getElementById('forgot-password-form');
+    
+    if (loginForm) loginForm.classList.remove('hidden');
+    if (forgotPasswordForm) forgotPasswordForm.classList.add('hidden');
+    
+    clearAuthErrors();
+}
+
+// Send password reset email
+async function sendPasswordReset() {
+    if (!window.firebaseAuth || !window.firebaseReady) {
+        showError('reset-error', 'Firebase is not ready. Please refresh the page.');
+        return;
+    }
+    
+    const email = document.getElementById('reset-email').value.trim();
+    
+    if (!email) {
+        showError('reset-error', 'Please enter your email address.');
+        return;
+    }
+    
+    try {
+        await window.firebaseAuth.sendPasswordResetEmail(email);
+        // Show success message
+        const resetError = document.getElementById('reset-error');
+        const resetSuccess = document.getElementById('reset-success');
+        if (resetError) resetError.classList.add('hidden');
+        if (resetSuccess) {
+            resetSuccess.textContent = 'Password reset email sent! Check your inbox and follow the instructions to reset your password.';
+            resetSuccess.classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('Password reset error:', error);
+        let errorMessage = 'Error sending reset email. ';
+        if (error.code === 'auth/user-not-found') {
+            errorMessage += 'No account found with this email.';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage += 'Invalid email address.';
+        } else {
+            errorMessage += error.message;
+        }
+        showError('reset-error', errorMessage);
+        const resetSuccess = document.getElementById('reset-success');
+        if (resetSuccess) resetSuccess.classList.add('hidden');
+    }
 }
 
 // Login with email and password
@@ -1272,6 +1347,9 @@ window.loginWithEmail = loginWithEmail;
 window.signupWithEmail = signupWithEmail;
 window.showLoginForm = showLoginForm;
 window.showSignupForm = showSignupForm;
+window.showForgotPasswordForm = showForgotPasswordForm;
+window.backToLogin = backToLogin;
+window.sendPasswordReset = sendPasswordReset;
 window.loadState = loadState; // Make available for firebase-init.js
 
 // Initialize on page load
