@@ -1843,6 +1843,8 @@ async function loadFriendsList() {
         const hasActiveTracker = state.people && state.people.length > 0;
         
         // Render online friends
+        // Clear existing content first
+        onlineList.innerHTML = '';
         if (onlineFriends.length === 0) {
             onlineList.innerHTML = '<p class="no-friends">No online friends</p>';
         } else {
@@ -1884,6 +1886,8 @@ async function loadFriendsList() {
         }
         
         // Render offline friends
+        // Clear existing content first
+        offlineList.innerHTML = '';
         if (offlineFriends.length === 0) {
             offlineList.innerHTML = '<p class="no-friends">No offline friends</p>';
         } else {
@@ -1940,21 +1944,67 @@ async function loadFriendsList() {
     }
 }
 
+// Debounce timer for friend status updates
+let friendStatusUpdateTimer = null;
+
 // Update friend online status in UI
 function updateFriendOnlineStatus(friendId, isOnline) {
-    const onlineList = document.getElementById('online-friends-list');
-    const offlineList = document.getElementById('offline-friends-list');
+    // Debounce updates to prevent flickering
+    if (friendStatusUpdateTimer) {
+        clearTimeout(friendStatusUpdateTimer);
+    }
     
-    // Find and move friend between lists
-    const allItems = [...onlineList.querySelectorAll('.friend-item'), ...offlineList.querySelectorAll('.friend-item')];
-    allItems.forEach(item => {
-        if (item.dataset.friendId === friendId) {
-            item.remove();
+    friendStatusUpdateTimer = setTimeout(() => {
+        const onlineList = document.getElementById('online-friends-list');
+        const offlineList = document.getElementById('offline-friends-list');
+        
+        if (!onlineList || !offlineList) return;
+        
+        // Find and move friend between lists
+        const allItems = [...onlineList.querySelectorAll('.friend-item'), ...offlineList.querySelectorAll('.friend-item')];
+        const friendItem = allItems.find(item => item.dataset.friendId === friendId);
+        
+        if (friendItem) {
+            // Update status indicator in place
+            const statusElement = friendItem.querySelector('.friend-item-status');
+            if (statusElement) {
+                statusElement.textContent = isOnline ? 'Online' : 'Offline';
+                statusElement.className = `friend-item-status ${isOnline ? 'online' : 'offline'}`;
+                
+                // Move item to correct list if needed
+                const currentList = friendItem.parentElement;
+                const targetList = isOnline ? onlineList : offlineList;
+                
+                if (currentList !== targetList) {
+                    friendItem.remove();
+                    targetList.appendChild(friendItem);
+                    
+                    // Update empty state messages
+                    if (onlineList.children.length === 0 || (onlineList.children.length === 1 && onlineList.children[0].tagName === 'P')) {
+                        onlineList.innerHTML = '<p class="no-friends">No online friends</p>';
+                    }
+                    if (offlineList.children.length === 0 || (offlineList.children.length === 1 && offlineList.children[0].tagName === 'P')) {
+                        offlineList.innerHTML = '<p class="no-friends">No offline friends</p>';
+                    }
+                    
+                    // Remove "no friends" message if list now has items
+                    const onlineNoFriends = onlineList.querySelector('.no-friends');
+                    const offlineNoFriends = offlineList.querySelector('.no-friends');
+                    if (onlineNoFriends && onlineList.querySelector('.friend-item')) {
+                        onlineNoFriends.remove();
+                    }
+                    if (offlineNoFriends && offlineList.querySelector('.friend-item')) {
+                        offlineNoFriends.remove();
+                    }
+                }
+            }
+        } else {
+            // If item not found, reload the list (shouldn't happen often)
+            loadFriendsList();
         }
-    });
-    
-    // Re-render friends list
-    loadFriendsList();
+        
+        friendStatusUpdateTimer = null;
+    }, 500); // 500ms debounce
 }
 
 // Copy invite link
