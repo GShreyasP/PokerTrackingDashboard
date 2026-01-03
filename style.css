@@ -1324,8 +1324,8 @@ h3 {
 
 .friend-search-result {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 10px;
     padding: 10px;
     background: white;
     border-radius: 6px;
@@ -1337,13 +1337,16 @@ h3 {
 }
 
 .friend-search-result-info {
-    flex: 1;
+    width: 100%;
 }
 
 .friend-search-result-name {
     font-weight: 600;
     color: #333;
     margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .friend-search-result-email {
