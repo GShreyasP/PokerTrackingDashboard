@@ -130,6 +130,9 @@ function restoreState(parsed) {
     
     // If we have people, show tracking section
     if (state.people && state.people.length > 0) {
+        const backToHomeBtn = document.getElementById('back-to-main-btn');
+        if (backToHomeBtn) backToHomeBtn.classList.add('hidden');
+        
         mainScreen.classList.add('hidden');
         setupSection.classList.add('hidden');
         trackingSection.classList.remove('hidden');
@@ -270,7 +273,9 @@ async function loadUserData(userId) {
                     const mainScreen = document.getElementById('main-screen');
                     const setupSection = document.getElementById('setup-section');
                     const trackingSection = document.getElementById('tracking-section');
+                    const backToHomeBtn = document.getElementById('back-to-main-btn');
                     
+                    if (backToHomeBtn) backToHomeBtn.classList.add('hidden');
                     if (mainScreen) mainScreen.classList.add('hidden');
                     if (setupSection) setupSection.classList.add('hidden');
                     if (trackingSection) trackingSection.classList.remove('hidden');
@@ -399,6 +404,12 @@ async function showMainScreen() {
     const mainScreen = document.getElementById('main-screen');
     const setupSection = document.getElementById('setup-section');
     const trackingSection = document.getElementById('tracking-section');
+    const authPage = document.getElementById('auth-page');
+    const backToHomeBtn = document.getElementById('back-to-main-btn');
+    
+    // Hide auth page if visible
+    if (authPage) authPage.classList.add('hidden');
+    
     if (mainScreen) {
         mainScreen.classList.remove('hidden');
         // Load user trackers and live tables
@@ -409,6 +420,16 @@ async function showMainScreen() {
     }
     if (setupSection) setupSection.classList.add('hidden');
     if (trackingSection) trackingSection.classList.add('hidden');
+    
+    // Show back to home button when on main screen (if authenticated)
+    if (backToHomeBtn && window.currentUser) {
+        backToHomeBtn.classList.remove('hidden');
+    } else if (backToHomeBtn) {
+        backToHomeBtn.classList.add('hidden');
+    }
+    
+    // Save viewing state (on main screen)
+    saveViewingState();
 }
 
 // Show setup section
@@ -456,9 +477,20 @@ async function showSetupSection() {
     const mainScreen = document.getElementById('main-screen');
     const setupSection = document.getElementById('setup-section');
     const trackingSection = document.getElementById('tracking-section');
+    const backToHomeBtn = document.getElementById('back-to-main-btn');
+    
     if (mainScreen) mainScreen.classList.add('hidden');
     if (setupSection) setupSection.classList.remove('hidden');
     if (trackingSection) trackingSection.classList.add('hidden');
+    
+    // Show back to home button when in setup (if authenticated)
+    if (backToHomeBtn) {
+        if (window.currentUser) {
+            backToHomeBtn.classList.remove('hidden');
+        } else {
+            backToHomeBtn.classList.add('hidden');
+        }
+    }
 }
 
 // Helper function to prepare state for Firestore (convert Dates to ISO strings)
@@ -1061,6 +1093,9 @@ async function startTracking() {
     }
     
     // Hide setup, show tracking
+    const backToHomeBtn = document.getElementById('back-to-main-btn');
+    if (backToHomeBtn) backToHomeBtn.classList.add('hidden');
+    
     setupSection.classList.add('hidden');
     trackingSection.classList.remove('hidden');
     
@@ -2941,6 +2976,9 @@ async function viewFriendTracker(friendId) {
         restoreState(friendState);
         
         // Hide main screen and setup, show tracking section
+        const backToHomeBtn = document.getElementById('back-to-main-btn');
+        if (backToHomeBtn) backToHomeBtn.classList.add('hidden');
+        
         if (mainScreen) mainScreen.classList.add('hidden');
         if (setupSection) setupSection.classList.add('hidden');
         if (trackingSection) trackingSection.classList.remove('hidden');

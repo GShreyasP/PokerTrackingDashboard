@@ -100,12 +100,18 @@ function showAuthPage() {
     const authPage = document.getElementById('auth-page');
     const setupSection = document.getElementById('setup-section');
     const trackingSection = document.getElementById('tracking-section');
+    const mainScreen = document.getElementById('main-screen');
     const headerUserInfo = document.getElementById('header-user-info');
+    const friendsBtn = document.getElementById('friends-btn');
+    const backToHomeBtn = document.getElementById('back-to-main-btn');
     
     if (authPage) authPage.classList.remove('hidden');
     if (setupSection) setupSection.classList.add('hidden');
     if (trackingSection) trackingSection.classList.add('hidden');
+    if (mainScreen) mainScreen.classList.add('hidden');
     if (headerUserInfo) headerUserInfo.classList.add('hidden');
+    if (friendsBtn) friendsBtn.classList.add('hidden');
+    if (backToHomeBtn) backToHomeBtn.classList.add('hidden');
 }
 
 // Show authenticated view (setup or tracking)
