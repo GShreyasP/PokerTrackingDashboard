@@ -93,5 +93,18 @@ service cloud.firestore {
       // Tracker owners can update edit requests for their tracker
       allow update: if isAuthenticated() && resource.data.trackerOwnerId == request.auth.uid;
     }
+    
+    // Tracker Join Requests collection - NEW (requests to join tracker as a person)
+    match /trackerJoinRequests/{requestId} {
+      // Users can read requests where they are the tracker owner or requester
+      allow read: if isAuthenticated() && 
+        (resource.data.trackerOwnerId == request.auth.uid || resource.data.requesterId == request.auth.uid);
+      
+      // Users can create join requests (requesting to join as a person)
+      allow create: if isAuthenticated() && request.resource.data.requesterId == request.auth.uid;
+      
+      // Tracker owners can update join requests for their tracker (approve/decline)
+      allow update: if isAuthenticated() && resource.data.trackerOwnerId == request.auth.uid;
+    }
   }
 }
