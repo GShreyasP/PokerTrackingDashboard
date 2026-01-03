@@ -1094,6 +1094,19 @@ function submitSubtract(personId) {
 
 // Update person name
 function updatePersonName(personId, newName) {
+    // Don't allow updating name if viewing friend's tracker without edit access
+    if (trackerViewState.isViewingFriendTracker && !trackerViewState.hasEditAccess) {
+        // Reset the input to the original name
+        const person = state.people.find(p => p.id === personId);
+        if (person) {
+            const nameInput = document.querySelector(`.widget-name-input[onchange*="${personId}"]`);
+            if (nameInput) {
+                nameInput.value = person.name || `Person ${personId + 1}`;
+            }
+        }
+        return;
+    }
+    
     const person = state.people.find(p => p.id === personId);
     if (person) {
         person.name = newName || `Person ${personId + 1}`;
@@ -2600,6 +2613,21 @@ function updateUIForViewingMode(hasEditAccess) {
             resetBtn.style.cursor = 'pointer';
         }
     }
+    
+    // Disable/enable name input fields in person widgets
+    document.querySelectorAll('.widget-name-input').forEach(input => {
+        if (canEdit) {
+            input.disabled = false;
+            input.style.opacity = '1';
+            input.style.cursor = 'text';
+            input.style.backgroundColor = 'white';
+        } else {
+            input.disabled = true;
+            input.style.opacity = '0.7';
+            input.style.cursor = 'not-allowed';
+            input.style.backgroundColor = '#f8f9fa';
+        }
+    });
     
     // Disable/enable forms
     document.querySelectorAll('#setup-section input, #setup-section button, .widget-form input, .widget-form button').forEach(element => {
