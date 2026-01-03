@@ -1451,7 +1451,6 @@ async function searchFriend() {
             <div class="friend-search-result">
                 <div class="friend-search-result-info">
                     <div class="friend-search-result-name">${user.name}</div>
-                    <div class="friend-search-result-email">${user.email}</div>
                 </div>
                 <button class="btn btn-primary btn-sm" onclick="sendFriendRequest('${user.id}', '${user.name.replace(/'/g, "\\'")}')">Add Friend</button>
             </div>
