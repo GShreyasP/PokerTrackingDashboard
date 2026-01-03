@@ -63,10 +63,40 @@ function restoreState(parsed) {
     // Restore state
     Object.assign(state, parsed);
     
-    // Convert timestamp strings back to Date objects
+    // Convert timestamp strings/objects back to Date objects
     if (state.transactions) {
         state.transactions.forEach(t => {
-            t.timestamp = new Date(t.timestamp);
+            if (t.timestamp) {
+                // Handle Firestore Timestamp objects
+                if (t.timestamp.toDate && typeof t.timestamp.toDate === 'function') {
+                    t.timestamp = t.timestamp.toDate();
+                }
+                // Handle ISO string timestamps
+                else if (typeof t.timestamp === 'string') {
+                    t.timestamp = new Date(t.timestamp);
+                }
+                // Handle number timestamps
+                else if (typeof t.timestamp === 'number') {
+                    t.timestamp = new Date(t.timestamp);
+                }
+                // Already a Date object, keep it
+                else if (t.timestamp instanceof Date) {
+                    // Keep as is
+                }
+                // Fallback: try to create Date anyway
+                else {
+                    t.timestamp = new Date(t.timestamp);
+                }
+                
+                // Validate the date
+                if (isNaN(t.timestamp.getTime())) {
+                    console.warn('Invalid date in transaction:', t, 'Using current date');
+                    t.timestamp = new Date();
+                }
+            } else {
+                // No timestamp, use current date
+                t.timestamp = new Date();
+            }
         });
     }
     
@@ -144,6 +174,21 @@ function showSetupSection() {
     if (trackingSection) trackingSection.classList.add('hidden');
 }
 
+// Helper function to prepare state for Firestore (convert Dates to ISO strings)
+function prepareStateForFirestore(stateData) {
+    const stateCopy = JSON.parse(JSON.stringify(stateData));
+    
+    // Convert Date objects in transactions to ISO strings
+    if (stateCopy.transactions) {
+        stateCopy.transactions = stateCopy.transactions.map(t => ({
+            ...t,
+            timestamp: t.timestamp instanceof Date ? t.timestamp.toISOString() : t.timestamp
+        }));
+    }
+    
+    return stateCopy;
+}
+
 // Save state to Firestore (if signed in) or localStorage (fallback)
 async function saveState() {
     // Don't save if viewing friend's tracker and don't have edit access
@@ -158,14 +203,15 @@ async function saveState() {
             try {
                 const ownerId = trackerViewState.viewingTrackerOwnerId;
                 const docRef = window.firebaseDb.collection('users').doc(ownerId);
+                const stateToSave = prepareStateForFirestore(state);
                 await docRef.set({
-                    state: state,
+                    state: stateToSave,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
                 return;
             } catch (error) {
                 console.error('Error saving friend tracker state:', error);
-                alert('Error saving changes. Please try again.');
+                alert('Error saving changes. Please check console for details and verify Firestore rules.');
                 return;
             }
         }
@@ -176,15 +222,21 @@ async function saveState() {
         try {
             const userId = window.currentUser.uid;
             const docRef = window.firebaseDb.collection('users').doc(userId);
+            const stateToSave = prepareStateForFirestore(state);
             await docRef.set({
-                state: state,
+                state: stateToSave,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
+            console.log('State saved successfully to Firestore');
         } catch (error) {
             console.error('Error saving to Firestore:', error);
+            console.error('Error code:', error.code);
+            console.error('Error message:', error.message);
+            
             // Fall back to localStorage
             try {
                 localStorage.setItem('pokerTrackerState', JSON.stringify(state));
+                console.log('Fell back to localStorage');
             } catch (e) {
                 console.error('Error saving to localStorage:', e);
             }
@@ -1171,8 +1223,26 @@ function renderPersonalLog(personId) {
         const colorClass = transaction.type === 'add' ? 'log-remove' : 'log-add';
         logEntry.className = `log-entry ${colorClass}`;
         
-        const timeStr = transaction.timestamp.toLocaleTimeString();
-        const dateStr = transaction.timestamp.toLocaleDateString();
+        // Safely format date
+        let dateStr = 'Unknown Date';
+        let timeStr = 'Unknown Time';
+        
+        if (transaction.timestamp) {
+            try {
+                // Ensure timestamp is a Date object
+                const date = transaction.timestamp instanceof Date 
+                    ? transaction.timestamp 
+                    : new Date(transaction.timestamp);
+                
+                if (!isNaN(date.getTime())) {
+                    dateStr = date.toLocaleDateString();
+                    timeStr = date.toLocaleTimeString();
+                }
+            } catch (e) {
+                console.error('Error formatting date in personal log:', e, transaction);
+            }
+        }
+        
         // Reverse signs: add = negative (putting money in), remove = positive (returning money)
         const sign = transaction.type === 'add' ? '-' : '+';
         const typeText = transaction.type === 'add' ? 'added' : 'removed';
@@ -1207,8 +1277,26 @@ function renderLog() {
         const colorClass = transaction.type === 'add' ? 'log-remove' : 'log-add';
         logEntry.className = `log-entry ${colorClass}`;
         
-        const timeStr = transaction.timestamp.toLocaleTimeString();
-        const dateStr = transaction.timestamp.toLocaleDateString();
+        // Safely format date
+        let dateStr = 'Unknown Date';
+        let timeStr = 'Unknown Time';
+        
+        if (transaction.timestamp) {
+            try {
+                // Ensure timestamp is a Date object
+                const date = transaction.timestamp instanceof Date 
+                    ? transaction.timestamp 
+                    : new Date(transaction.timestamp);
+                
+                if (!isNaN(date.getTime())) {
+                    dateStr = date.toLocaleDateString();
+                    timeStr = date.toLocaleTimeString();
+                }
+            } catch (e) {
+                console.error('Error formatting date:', e, transaction);
+            }
+        }
+        
         // Reverse signs: add = negative (putting money in), remove = positive (returning money)
         const sign = transaction.type === 'add' ? '-' : '+';
         const typeText = transaction.type === 'add' ? 'added' : 'removed';
@@ -1216,9 +1304,9 @@ function renderLog() {
         logEntry.innerHTML = `
             <div class="log-time">${dateStr} ${timeStr}</div>
             <div class="log-details">
-                <span class="log-person">${transaction.personName}</span>
+                <span class="log-person">${transaction.personName || 'Unknown'}</span>
                 <span class="log-action">${typeText}</span>
-                <span class="log-amount">${sign}$${transaction.amount.toFixed(2)}</span>
+                <span class="log-amount">${sign}$${(transaction.amount || 0).toFixed(2)}</span>
             </div>
         `;
         
