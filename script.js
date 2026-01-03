@@ -656,28 +656,48 @@ async function signOut() {
     }
 }
 
-// Reset all data
-async function resetData() {
-    // Don't allow reset if viewing friend's tracker
+// Delete current table/tracker
+async function deleteCurrentTable() {
+    // Don't allow delete if viewing friend's tracker
     if (trackerViewState.isViewingFriendTracker) {
-        alert('You cannot reset data when viewing a friend\'s tracker.');
+        showAlertModal('You cannot delete a table when viewing a friend\'s tracker.');
         return;
     }
-    
-    if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
-        // Clear localStorage
-        localStorage.removeItem('pokerTrackerState');
-        
-        // Delete from Firestore if user is signed in
-        if (window.currentUser && window.firebaseDb && window.firebaseReady) {
+
+    if (!state.trackerId) {
+        showAlertModal('No table to delete.');
+        return;
+    }
+
+    if (confirm('Are you sure you want to delete this table? This cannot be undone.')) {
+        // Delete from Firestore trackers array
+        if (window.firebaseDb && window.currentUser) {
             try {
                 const userId = window.currentUser.uid;
                 const docRef = window.firebaseDb.collection('users').doc(userId);
-                await docRef.delete();
+                const doc = await docRef.get();
+                
+                if (doc.exists && doc.data().trackers) {
+                    const trackers = doc.data().trackers;
+                    // Remove the current tracker from the array
+                    const filteredTrackers = trackers.filter(t => t.id !== state.trackerId);
+                    
+                    await docRef.set({
+                        trackers: filteredTrackers,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    
+                    console.log('Tracker deleted from Firestore');
+                }
             } catch (error) {
-                console.error('Error deleting from Firestore:', error);
+                console.error('Error deleting tracker:', error);
+                showAlertModal('Error deleting table. Please try again.');
+                return;
             }
         }
+        
+        // Clear localStorage
+        localStorage.removeItem('pokerTrackerState');
         
         // Reset state
         state = {
@@ -700,33 +720,13 @@ async function resetData() {
                 red: 0,
                 blue: 0
             },
-            transactions: []
+            transactions: [],
+            trackerId: null,
+            trackerName: null
         };
         
-        // Show setup section and hide tracking section
-        setupSection.classList.remove('hidden');
-        trackingSection.classList.add('hidden');
-        
-        // Reset form inputs - use placeholders instead of preset values
-        numPeopleInput.value = '';
-        stackValueInput.value = '';
-        chipsPerStackInput.value = '';
-        sameValueToggle.checked = false; // Show chip value options by default
-        toggleChipValueMode();
-        
-        // Clear chip value inputs
-        document.getElementById('black-value').value = '';
-        document.getElementById('white-value').value = '';
-        document.getElementById('green-value').value = '';
-        document.getElementById('red-value').value = '';
-        document.getElementById('blue-value').value = '';
-        
-        // Clear chip count inputs
-        document.getElementById('black-count').value = '';
-        document.getElementById('white-count').value = '';
-        document.getElementById('green-count').value = '';
-        document.getElementById('red-count').value = '';
-        document.getElementById('blue-count').value = '';
+        // Show main screen (which will load remaining trackers)
+        await showMainScreen();
     }
 }
 
@@ -3151,7 +3151,7 @@ function updateUIForViewingMode(hasEditAccess) {
         }
     });
     
-    // Disable reset button if viewing friend's tracker (even with edit access)
+    // Disable delete table button if viewing friend's tracker (even with edit access)
     const resetBtn = document.getElementById('reset-btn');
     if (resetBtn) {
         if (isViewingFriendTracker) {
@@ -3649,7 +3649,7 @@ window.submitAdd = submitAdd;
 window.submitSubtract = submitSubtract;
 window.updatePersonName = updatePersonName;
 window.updatePersonMoney = updatePersonMoney;
-window.resetData = resetData;
+window.deleteCurrentTable = deleteCurrentTable;
 window.showAddPersonForm = showAddPersonForm;
 window.hideAddPersonForm = hideAddPersonForm;
 window.submitAddPerson = submitAddPerson;
