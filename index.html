@@ -101,6 +101,22 @@
             </div>
         </div>
         
+        <!-- Main Screen (shown when authenticated but no tracker) -->
+        <div id="main-screen" class="main-screen hidden">
+            <div class="main-screen-content">
+                <button id="create-tracker-btn" class="btn btn-primary btn-create-tracker" onclick="showSetupSection()">
+                    Create Your Own Tracker
+                </button>
+                
+                <div class="live-tables-section">
+                    <h2>Live Tables</h2>
+                    <div id="live-tables-container" class="live-tables-container">
+                        <p class="no-live-tables">No live tables available</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Initial Setup Section (hidden until authenticated) -->
         <div id="setup-section" class="setup-section hidden">
             <h2>Initial Setup</h2>
@@ -238,6 +254,12 @@
                         </div>
                         <small>Share this link with friends to invite them</small>
                     </div>
+                </div>
+                
+                <!-- Tracker Join Requests Section -->
+                <div id="tracker-join-requests-section" class="friends-section hidden">
+                    <h3>Tracker Join Requests</h3>
+                    <div id="tracker-join-requests-list" class="friends-list"></div>
                 </div>
                 
                 <!-- Tracker Access Requests Section -->

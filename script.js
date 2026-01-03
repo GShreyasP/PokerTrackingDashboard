@@ -25,6 +25,7 @@ let trackerViewState = {
 };
 
 // DOM Elements
+const mainScreen = document.getElementById('main-screen');
 const setupSection = document.getElementById('setup-section');
 const trackingSection = document.getElementById('tracking-section');
 const numPeopleInput = document.getElementById('num-people');
@@ -39,6 +40,7 @@ const chipValueDisplay = document.getElementById('chip-value-display');
 const totalChipsAmount = document.getElementById('total-chips-amount');
 const chipsWarning = document.getElementById('chips-warning');
 const logEntriesDiv = document.getElementById('log-entries');
+const liveTablesContainer = document.getElementById('live-tables-container');
 
 // Initialize
 sameValueToggle.addEventListener('change', toggleChipValueMode);
@@ -116,6 +118,7 @@ function restoreState(parsed) {
     
     // If we have people, show tracking section
     if (state.people && state.people.length > 0) {
+        mainScreen.classList.add('hidden');
         setupSection.classList.add('hidden');
         trackingSection.classList.remove('hidden');
         renderPeopleWidgets();
@@ -128,9 +131,15 @@ function restoreState(parsed) {
         const hasEditAccess = trackerViewState.isOwner || trackerViewState.hasEditAccess;
         updateUIForViewingMode(hasEditAccess);
     } else {
-        // No data, show setup section
-        setupSection.classList.remove('hidden');
+        // No data, show main screen
+        mainScreen.classList.remove('hidden');
+        setupSection.classList.add('hidden');
         trackingSection.classList.add('hidden');
+        
+        // Load live tables
+        if (window.firebaseDb && window.currentUser) {
+            loadLiveTables();
+        }
     }
 }
 
@@ -152,9 +161,9 @@ async function loadUserData(userId) {
         } else {
             // No data in Firestore, try localStorage
             const hasLocalData = loadState();
-            // If no local data either, show setup section
+            // If no local data either, show main screen
             if (!hasLocalData) {
-                showSetupSection();
+                showMainScreen();
             }
         }
     } catch (error) {
@@ -162,15 +171,33 @@ async function loadUserData(userId) {
         // Fall back to localStorage
         const hasLocalData = loadState();
         if (!hasLocalData) {
-            showSetupSection();
+            showMainScreen();
         }
     }
 }
 
-// Show setup section
-function showSetupSection() {
+// Show main screen
+function showMainScreen() {
+    const mainScreen = document.getElementById('main-screen');
     const setupSection = document.getElementById('setup-section');
     const trackingSection = document.getElementById('tracking-section');
+    if (mainScreen) {
+        mainScreen.classList.remove('hidden');
+        // Load live tables
+        if (window.firebaseDb && window.currentUser) {
+            loadLiveTables();
+        }
+    }
+    if (setupSection) setupSection.classList.add('hidden');
+    if (trackingSection) trackingSection.classList.add('hidden');
+}
+
+// Show setup section
+function showSetupSection() {
+    const mainScreen = document.getElementById('main-screen');
+    const setupSection = document.getElementById('setup-section');
+    const trackingSection = document.getElementById('tracking-section');
+    if (mainScreen) mainScreen.classList.add('hidden');
     if (setupSection) setupSection.classList.remove('hidden');
     if (trackingSection) trackingSection.classList.add('hidden');
 }
@@ -1501,6 +1528,7 @@ function toggleFriendsSidebar() {
             loadFriendsList();
             loadFriendRequests();
             loadTrackerAccessRequests();
+            loadTrackerJoinRequests();
         } else {
             sidebar.classList.add('hidden');
             overlay.classList.add('hidden');
@@ -2363,11 +2391,19 @@ async function viewFriendTracker(friendId) {
             trackerViewState.ownTrackerState = JSON.parse(JSON.stringify(state));
         }
         
-        // Check access
-        const hasAccess = await checkTrackerAccess(friendId);
+        // Check access, create read-only access if doesn't exist (for viewing)
+        let hasAccess = await checkTrackerAccess(friendId);
         if (!hasAccess) {
-            alert('You need to join the tracker first.');
-            return;
+            // Create read-only access automatically for viewing
+            const accessRef = window.firebaseDb.collection('trackerAccess');
+            await accessRef.add({
+                trackerOwnerId: friendId,
+                userId: window.currentUser.uid,
+                status: 'active',
+                hasEditAccess: false,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            hasAccess = true;
         }
         
         // Load friend's tracker data
@@ -2401,10 +2437,15 @@ async function viewFriendTracker(friendId) {
         // Restore friend's state
         restoreState(friendState);
         
+        // Hide main screen and setup, show tracking section
+        if (mainScreen) mainScreen.classList.add('hidden');
+        if (setupSection) setupSection.classList.add('hidden');
+        if (trackingSection) trackingSection.classList.remove('hidden');
+        
         // Update UI for read-only mode
         updateUIForViewingMode(hasEditAccess);
         
-        // Close friends sidebar
+        // Close friends sidebar if open
         toggleFriendsSidebar();
         
         // Show banner indicating viewing mode
@@ -2577,6 +2618,161 @@ async function declineEditingAccess(requestId) {
     }
 }
 
+// Load tracker join requests (requests to join tracker as a person)
+async function loadTrackerJoinRequests() {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const currentUserId = window.currentUser.uid;
+    const requestsSection = document.getElementById('tracker-join-requests-section');
+    const requestsList = document.getElementById('tracker-join-requests-list');
+    
+    if (!requestsSection || !requestsList) return;
+    
+    try {
+        // Get requests where current user is the tracker owner
+        const requestsRef = window.firebaseDb.collection('trackerJoinRequests');
+        const snapshot = await requestsRef
+            .where('trackerOwnerId', '==', currentUserId)
+            .where('status', '==', 'pending')
+            .get();
+        
+        if (snapshot.empty) {
+            requestsSection.classList.add('hidden');
+            return;
+        }
+        
+        requestsSection.classList.remove('hidden');
+        
+        const requests = [];
+        for (const doc of snapshot.docs) {
+            const requestData = doc.data();
+            const requesterId = requestData.requesterId;
+            
+            // Get requester info
+            const userDoc = await window.firebaseDb.collection('users').doc(requesterId).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                requests.push({
+                    id: doc.id,
+                    requesterId: requesterId,
+                    name: userData.displayName || userData.name || userData.email || 'Unknown',
+                    email: userData.email || '',
+                    moneyAmount: requestData.moneyAmount || 0
+                });
+            }
+        }
+        
+        if (requests.length === 0) {
+            requestsSection.classList.add('hidden');
+            return;
+        }
+        
+        requestsList.innerHTML = requests.map(request => `
+            <div class="friend-request-item">
+                <div class="friend-search-result-info">
+                    <div class="friend-search-result-name">${request.name}</div>
+                    <div style="font-size: 0.85em; color: #666;">wants to join your tracker with $${request.moneyAmount.toFixed(2)}</div>
+                </div>
+                <div class="friend-request-actions">
+                    <button class="btn-accept" onclick="approveJoinRequest('${request.id}', '${request.requesterId}', ${request.moneyAmount}, '${request.name.replace(/'/g, "\\'")}')">Approve</button>
+                    <button class="btn-decline" onclick="declineJoinRequest('${request.id}')">Decline</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading tracker join requests:', error);
+    }
+}
+
+// Approve join request (add requester as a person to tracker)
+async function approveJoinRequest(requestId, requesterId, moneyAmount, requesterName) {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const currentUserId = window.currentUser.uid;
+    
+    try {
+        // Load current tracker state
+        const userDoc = await window.firebaseDb.collection('users').doc(currentUserId).get();
+        if (!userDoc.exists || !userDoc.data().state) {
+            alert('Tracker not found.');
+            return;
+        }
+        
+        const trackerState = userDoc.data().state;
+        
+        // Find the next available person ID
+        const maxId = trackerState.people.length > 0 
+            ? Math.max(...trackerState.people.map(p => p.id))
+            : -1;
+        const newPersonId = maxId + 1;
+        
+        // Add new person to tracker
+        const newPerson = {
+            id: newPersonId,
+            name: requesterName,
+            moneyPutIn: moneyAmount,
+            moneyReturned: 0,
+            totalMoney: moneyAmount,
+            chips: 0
+        };
+        
+        trackerState.people.push(newPerson);
+        
+        // Add transaction for the new person
+        if (trackerState.transactions === undefined) {
+            trackerState.transactions = [];
+        }
+        
+        trackerState.transactions.push({
+            id: Date.now(),
+            personId: newPersonId,
+            personName: requesterName,
+            amount: moneyAmount,
+            type: 'add',
+            timestamp: new Date().toISOString()
+        });
+        
+        // Save updated state
+        const stateToSave = prepareStateForFirestore(trackerState);
+        await window.firebaseDb.collection('users').doc(currentUserId).set({
+            state: stateToSave,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        
+        // Update request status
+        const requestRef = window.firebaseDb.collection('trackerJoinRequests').doc(requestId);
+        await requestRef.update({ status: 'approved' });
+        
+        // Reload current state if viewing own tracker
+        if (!trackerViewState.isViewingFriendTracker) {
+            await loadUserData(currentUserId);
+        }
+        
+        // Reload requests
+        loadTrackerJoinRequests();
+        
+        alert(requesterName + ' has been added to your tracker with $' + moneyAmount.toFixed(2) + '!');
+    } catch (error) {
+        console.error('Error approving join request:', error);
+        alert('Error approving join request. Please try again.');
+    }
+}
+
+// Decline join request
+async function declineJoinRequest(requestId) {
+    if (!window.firebaseDb) return;
+    
+    try {
+        const requestRef = window.firebaseDb.collection('trackerJoinRequests').doc(requestId);
+        await requestRef.update({ status: 'declined' });
+        
+        loadTrackerJoinRequests();
+    } catch (error) {
+        console.error('Error declining join request:', error);
+        alert('Error declining request. Please try again.');
+    }
+}
+
 // Return to own tracker
 async function returnToOwnTracker() {
     if (!window.firebaseDb || !window.currentUser) return;
@@ -2725,6 +2921,145 @@ function hideViewingModeBanner() {
     }
 }
 
+// Load live tables (friends' active trackers)
+async function loadLiveTables() {
+    if (!window.firebaseDb || !window.currentUser || !liveTablesContainer) return;
+    
+    const currentUserId = window.currentUser.uid;
+    
+    try {
+        // Get all friends
+        const friendsRef = window.firebaseDb.collection('friends');
+        const snapshot1 = await friendsRef.where('user1', '==', currentUserId).get();
+        const snapshot2 = await friendsRef.where('user2', '==', currentUserId).get();
+        
+        const friendIds = new Set();
+        snapshot1.forEach(doc => friendIds.add(doc.data().user2));
+        snapshot2.forEach(doc => friendIds.add(doc.data().user1));
+        
+        if (friendIds.size === 0) {
+            liveTablesContainer.innerHTML = '<p class="no-live-tables">No friends yet. Add friends to see their live tables!</p>';
+            return;
+        }
+        
+        // Get friends with active trackers
+        const liveTables = [];
+        for (const friendId of friendIds) {
+            const hasTracker = await checkFriendHasTracker(friendId);
+            if (hasTracker) {
+                const userDoc = await window.firebaseDb.collection('users').doc(friendId).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    const friendName = userData.displayName || userData.name || userData.email || 'Unknown';
+                    const hasAccess = await checkTrackerAccess(friendId);
+                    
+                    liveTables.push({
+                        friendId: friendId,
+                        friendName: friendName,
+                        hasAccess: hasAccess
+                    });
+                }
+            }
+        }
+        
+        if (liveTables.length === 0) {
+            liveTablesContainer.innerHTML = '<p class="no-live-tables">No live tables available</p>';
+            return;
+        }
+        
+        // Render live table widgets
+        liveTablesContainer.innerHTML = liveTables.map(table => `
+            <div class="live-table-widget">
+                <img src="assets/image-c90fcce1-ebd6-43e7-94b7-f3eb6415cdae.png" alt="Poker Table" class="live-table-image" onerror="this.style.display='none'">
+                <div class="live-table-info">
+                    <h3>${table.friendName}'s Table</h3>
+                    <div class="live-table-actions">
+                        ${table.hasAccess ? `
+                            <button class="btn btn-primary" onclick="viewFriendTracker('${table.friendId}')">View Tracker</button>
+                        ` : `
+                            <button class="btn btn-primary" onclick="showJoinTrackerModal('${table.friendId}', '${table.friendName.replace(/'/g, "\\'")}')">Join Tracker</button>
+                            <button class="btn btn-secondary" onclick="viewFriendTracker('${table.friendId}')">View Tracker</button>
+                        `}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading live tables:', error);
+        liveTablesContainer.innerHTML = '<p class="no-live-tables">Error loading live tables</p>';
+    }
+}
+
+// Show join tracker modal (request to join)
+function showJoinTrackerModal(friendId, friendName) {
+    const amount = prompt(`Enter the amount of money you want to put in ${friendName}'s tracker:`);
+    if (amount !== null && amount !== '') {
+        const moneyAmount = parseFloat(amount);
+        if (isNaN(moneyAmount) || moneyAmount <= 0) {
+            alert('Please enter a valid amount greater than 0.');
+            return;
+        }
+        requestJoinTracker(friendId, friendName, moneyAmount);
+    }
+}
+
+// Request to join a friend's tracker (adds user as a person to the tracker)
+async function requestJoinTracker(friendId, friendName, moneyAmount) {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const currentUserId = window.currentUser.uid;
+    
+    try {
+        // Check if request already exists
+        const requestsRef = window.firebaseDb.collection('trackerJoinRequests');
+        const existingRequest = await requestsRef
+            .where('trackerOwnerId', '==', friendId)
+            .where('requesterId', '==', currentUserId)
+            .where('status', '==', 'pending')
+            .get();
+        
+        if (!existingRequest.empty) {
+            alert('You have already sent a join request to this tracker.');
+            return;
+        }
+        
+        // Create join request
+        await requestsRef.add({
+            trackerOwnerId: friendId,
+            requesterId: currentUserId,
+            moneyAmount: moneyAmount,
+            status: 'pending',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        alert('Join request sent to ' + friendName + '! They will need to approve it to add you to their tracker.');
+        
+        // Also create read-only access so they can view
+        const accessRef = window.firebaseDb.collection('trackerAccess');
+        const existingAccess = await accessRef
+            .where('trackerOwnerId', '==', friendId)
+            .where('userId', '==', currentUserId)
+            .where('status', '==', 'active')
+            .get();
+        
+        if (existingAccess.empty) {
+            await accessRef.add({
+                trackerOwnerId: friendId,
+                userId: currentUserId,
+                status: 'active',
+                hasEditAccess: false,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+        
+        // Reload live tables
+        loadLiveTables();
+    } catch (error) {
+        console.error('Error requesting to join tracker:', error);
+        alert('Error sending join request. Please try again.');
+    }
+}
+
 // Make functions globally accessible
 window.showAddForm = showAddForm;
 window.showSubtractForm = showSubtractForm;
@@ -2771,6 +3106,11 @@ window.declineEditingAccess = declineEditingAccess;
 window.returnToOwnTracker = returnToOwnTracker;
 window.showFriendTrackerOptions = showFriendTrackerOptions;
 window.grantFriendEditAccess = grantFriendEditAccess;
+window.showJoinTrackerModal = showJoinTrackerModal;
+window.requestJoinTracker = requestJoinTracker;
+window.loadLiveTables = loadLiveTables;
+window.approveJoinRequest = approveJoinRequest;
+window.declineJoinRequest = declineJoinRequest;
 window.revokeFriendEditAccess = revokeFriendEditAccess;
 
 // Initialize on page load
