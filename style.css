@@ -1339,9 +1339,21 @@ h3 {
     margin-bottom: 8px;
 }
 
-.invite-link-container .form-input {
+.invite-link-text {
     flex: 1;
+    padding: 12px;
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
     font-size: 0.85em;
+    color: #333;
+    word-break: break-all;
+    line-height: 1.4;
+    min-height: 20px;
+}
+
+.invite-link-container {
+    align-items: center;
 }
 
 .friends-invite-section small {
