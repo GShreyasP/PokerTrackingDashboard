@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is the document owner
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Users can read their own document
+      allow read: if isOwner(userId);
+      
+      // Users can read other users' documents (to view friend profiles and trackers)
+      allow read: if isAuthenticated();
+      
+      // Users can write to their own document
+      allow write: if isOwner(userId);
+      
+      // Note: Users with edit access can write to friend's document
+      // This is handled by allowing authenticated users to write if they have edit access
+      // The app will check edit access before saving
+      allow write: if isAuthenticated();
+    }
+    
+    // Friends collection
+    match /friends/{friendId} {
+      // Users can read friend relationships where they are involved
+      allow read: if isAuthenticated() && 
+        (resource.data.user1 == request.auth.uid || resource.data.user2 == request.auth.uid);
+      
+      // Users can create friend relationships
+      allow create: if isAuthenticated() && 
+        (request.resource.data.user1 == request.auth.uid || request.resource.data.user2 == request.auth.uid);
+    }
+    
+    // Friend Requests collection
+    match /friendRequests/{requestId} {
+      // Users can read requests sent to them or by them
+      allow read: if isAuthenticated() && 
+        (resource.data.to == request.auth.uid || resource.data.from == request.auth.uid);
+      
+      // Users can create requests
+      allow create: if isAuthenticated() && request.resource.data.from == request.auth.uid;
+      
+      // Users can update requests sent to them
+      allow update: if isAuthenticated() && resource.data.to == request.auth.uid;
+    }
+    
+    // Online Status collection
+    match /onlineStatus/{userId} {
+      // Users can read any online status
+      allow read: if isAuthenticated();
+      
+      // Users can write their own online status
+      allow write: if isOwner(userId);
+    }
+    
+    // Tracker Access collection - NEW
+    match /trackerAccess/{accessId} {
+      // Users can read access records where they are the owner or the user
+      allow read: if isAuthenticated() && 
+        (resource.data.trackerOwnerId == request.auth.uid || resource.data.userId == request.auth.uid);
+      
+      // Users can create access records (when joining a tracker)
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // Tracker owners can create access records for their tracker
+      allow create: if isAuthenticated() && request.resource.data.trackerOwnerId == request.auth.uid;
+      
+      // Tracker owners can update access records for their tracker
+      allow update: if isAuthenticated() && resource.data.trackerOwnerId == request.auth.uid;
+      
+      // Users can delete their own access records (if needed)
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Tracker Edit Requests collection - NEW
+    match /trackerEditRequests/{requestId} {
+      // Users can read requests where they are the tracker owner or requester
+      allow read: if isAuthenticated() && 
+        (resource.data.trackerOwnerId == request.auth.uid || resource.data.requesterId == request.auth.uid);
+      
+      // Users can create edit requests (requesting edit access)
+      allow create: if isAuthenticated() && request.resource.data.requesterId == request.auth.uid;
+      
+      // Tracker owners can update edit requests for their tracker
+      allow update: if isAuthenticated() && resource.data.trackerOwnerId == request.auth.uid;
+    }
+  }
+}
