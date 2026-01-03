@@ -3169,9 +3169,22 @@ function showJoinTrackerModal(friendId, friendName) {
 
 // Request to join a friend's tracker (adds user as a person to the tracker)
 async function requestJoinTracker(friendId, friendName, moneyAmount) {
-    if (!window.firebaseDb || !window.currentUser) return;
+    console.log('requestJoinTracker called with:', { friendId, friendName, moneyAmount });
+    
+    if (!window.firebaseDb) {
+        console.error('Firebase DB not available');
+        showAlertModal('Firebase is not ready. Please refresh the page.');
+        return;
+    }
+    
+    if (!window.currentUser) {
+        console.error('Current user not available');
+        showAlertModal('You must be signed in to send a join request.');
+        return;
+    }
     
     const currentUserId = window.currentUser.uid;
+    console.log('Current user ID:', currentUserId);
     
     try {
         // Check if request already exists
@@ -3182,19 +3195,24 @@ async function requestJoinTracker(friendId, friendName, moneyAmount) {
             .where('status', '==', 'pending')
             .get();
         
+        console.log('Existing requests check:', existingRequest.size);
+        
         if (!existingRequest.empty) {
             showAlertModal('You have already sent a join request to this tracker.');
             return;
         }
         
         // Create join request
-        await requestsRef.add({
+        console.log('Creating join request...');
+        const requestDoc = await requestsRef.add({
             trackerOwnerId: friendId,
             requesterId: currentUserId,
             moneyAmount: moneyAmount,
             status: 'pending',
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
+        
+        console.log('Join request created with ID:', requestDoc.id);
         
         showAlertModal('Join request sent to ' + friendName + '! They will need to approve it to add you to their tracker.');
         
@@ -3207,6 +3225,7 @@ async function requestJoinTracker(friendId, friendName, moneyAmount) {
             .get();
         
         if (existingAccess.empty) {
+            console.log('Creating tracker access...');
             await accessRef.add({
                 trackerOwnerId: friendId,
                 userId: currentUserId,
@@ -3214,13 +3233,21 @@ async function requestJoinTracker(friendId, friendName, moneyAmount) {
                 hasEditAccess: false,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
+            console.log('Tracker access created');
+        } else {
+            console.log('Tracker access already exists');
         }
         
         // Reload live tables
         loadLiveTables();
     } catch (error) {
         console.error('Error requesting to join tracker:', error);
-        showAlertModal('Error sending join request. Please try again.');
+        console.error('Error details:', {
+            code: error.code,
+            message: error.message,
+            stack: error.stack
+        });
+        showAlertModal('Error sending join request: ' + (error.message || 'Please try again.'));
     }
 }
 
@@ -3280,6 +3307,8 @@ function confirmAmountInput() {
     const inputEl = document.getElementById('amount-input-field');
     const amount = inputEl.value.trim();
     
+    console.log('confirmAmountInput called, amount:', amount);
+    
     if (amount === '') {
         showAlertModal('Please enter a valid amount greater than 0.');
         return;
@@ -3291,10 +3320,32 @@ function confirmAmountInput() {
         return;
     }
     
+    console.log('Amount validated:', moneyAmount);
+    console.log('Callback available:', !!amountInputCallback);
+    console.log('Current friend ID:', currentFriendId);
+    console.log('Current friend name:', currentFriendName);
+    
+    // Save callback and friend info before closing modal (which clears them)
+    const callback = amountInputCallback;
+    const friendId = currentFriendId;
+    const friendName = currentFriendName;
+    
+    // Close modal (this clears the callback)
     closeAmountInputModal();
     
-    if (amountInputCallback) {
-        amountInputCallback(moneyAmount);
+    // Now call the saved callback
+    if (callback) {
+        console.log('Calling callback with amount:', moneyAmount);
+        try {
+            callback(moneyAmount);
+            console.log('Callback executed successfully');
+        } catch (error) {
+            console.error('Error in callback:', error);
+            showAlertModal('Error processing request: ' + (error.message || 'Unknown error'));
+        }
+    } else {
+        console.error('No callback available!');
+        showAlertModal('Error: No callback function available. Please try again.');
     }
 }
 
