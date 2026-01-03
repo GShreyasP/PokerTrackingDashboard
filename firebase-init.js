@@ -141,7 +141,7 @@ function showAuthPage() {
 }
 
 // Show authenticated view (setup or tracking)
-function showAuthenticatedView(user) {
+async function showAuthenticatedView(user) {
     const authPage = document.getElementById('auth-page');
     const friendsBtn = document.getElementById('friends-btn');
     const userInfo = document.getElementById('user-info');
@@ -167,13 +167,33 @@ function showAuthenticatedView(user) {
         headerUserName.textContent = user.displayName || user.email;
         headerUserInfo.classList.remove('hidden');
         
-        // Get and display unique ID
-        if (window.getOrCreateUniqueId) {
-            const uniqueId = await window.getOrCreateUniqueId(user.uid);
-            const headerUserId = document.getElementById('header-user-id');
-            if (headerUserId && uniqueId) {
-                headerUserId.textContent = `ID: ${uniqueId}`;
+        // Get and display unique ID (with delay to ensure script.js is loaded)
+        if (window.getOrCreateUniqueId && window.firebaseDb) {
+            try {
+                const uniqueId = await window.getOrCreateUniqueId(user.uid);
+                const headerUserId = document.getElementById('header-user-id');
+                if (headerUserId && uniqueId) {
+                    headerUserId.textContent = `ID: ${uniqueId}`;
+                }
+            } catch (error) {
+                console.error('Error getting unique ID:', error);
+                // Don't block the UI if unique ID fails
             }
+        } else {
+            // If getOrCreateUniqueId not available yet, try again after a short delay
+            setTimeout(async () => {
+                if (window.getOrCreateUniqueId && window.firebaseDb) {
+                    try {
+                        const uniqueId = await window.getOrCreateUniqueId(user.uid);
+                        const headerUserId = document.getElementById('header-user-id');
+                        if (headerUserId && uniqueId) {
+                            headerUserId.textContent = `ID: ${uniqueId}`;
+                        }
+                    } catch (error) {
+                        console.error('Error getting unique ID (retry):', error);
+                    }
+                }
+            }, 500);
         }
     }
     
