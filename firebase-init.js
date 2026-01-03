@@ -22,6 +22,12 @@ async function initFirebase() {
         // Dispatch event when Firebase is ready
         window.dispatchEvent(new Event('firebase-ready'));
         
+        // Ensure friends button is hidden on initial load
+        const friendsBtn = document.getElementById('friends-btn');
+        if (friendsBtn) {
+            friendsBtn.classList.add('hidden');
+        }
+        
         // Listen for auth state changes
         window.firebaseAuth.onAuthStateChanged(async (user) => {
             if (user) {
@@ -42,7 +48,7 @@ async function initFirebase() {
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
                 
-                // Show friends button
+                // Show friends button only after authenticated view is shown
                 if (window.showFriendsButton) {
                     window.showFriendsButton();
                 }
@@ -117,12 +123,18 @@ function showAuthPage() {
 // Show authenticated view (setup or tracking)
 function showAuthenticatedView(user) {
     const authPage = document.getElementById('auth-page');
+    const friendsBtn = document.getElementById('friends-btn');
     const userInfo = document.getElementById('user-info');
     const userName = document.getElementById('user-name');
     const headerUserInfo = document.getElementById('header-user-info');
     const headerUserName = document.getElementById('header-user-name');
     
     if (authPage) authPage.classList.add('hidden');
+    
+    // Ensure friends button is hidden until explicitly shown after auth page is hidden
+    if (friendsBtn) {
+        friendsBtn.classList.add('hidden');
+    }
     
     // Update user info in tracking section (if exists)
     if (userInfo && userName) {

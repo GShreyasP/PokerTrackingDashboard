@@ -1999,8 +1999,13 @@ function closeFriendsSidebar() {
 // Show friends button when authenticated
 function showFriendsButton() {
     const friendsBtn = document.getElementById('friends-btn');
-    if (friendsBtn) {
+    const authPage = document.getElementById('auth-page');
+    
+    // Only show friends button if authenticated and not on auth page
+    if (friendsBtn && window.currentUser && authPage && authPage.classList.contains('hidden')) {
         friendsBtn.classList.remove('hidden');
+    } else if (friendsBtn) {
+        friendsBtn.classList.add('hidden');
     }
 }
 
