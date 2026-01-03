@@ -2888,21 +2888,17 @@ async function showViewingModeBanner(trackerOwnerId, hasEditAccess) {
     const banner = document.createElement('div');
     banner.id = 'viewing-mode-banner';
     banner.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         padding: 15px 20px;
         text-align: center;
-        z-index: 10000;
         box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         display: flex;
         justify-content: center;
         align-items: center;
         gap: 20px;
         flex-wrap: wrap;
+        margin-bottom: 20px;
     `;
     
     const message = hasEditAccess 
@@ -2915,20 +2911,13 @@ async function showViewingModeBanner(trackerOwnerId, hasEditAccess) {
         <button onclick="returnToOwnTracker()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 5px 15px; border-radius: 5px; cursor: pointer; font-weight: 600;">Return to My Tracker</button>
     `;
     
-    document.body.insertBefore(banner, document.body.firstChild);
-    
-    // Calculate banner height
-    const bannerHeight = banner.offsetHeight;
-    
-    // Add margin-top to container to account for fixed banner
+    // Insert banner at the beginning of the container instead of body
     const container = document.querySelector('.container');
     if (container) {
-        container.style.marginTop = bannerHeight + 'px';
+        container.insertBefore(banner, container.firstChild);
+    } else {
+        document.body.insertBefore(banner, document.body.firstChild);
     }
-    
-    // Also add padding to body for spacing
-    const currentBodyPadding = parseInt(window.getComputedStyle(document.body).paddingTop) || 0;
-    document.body.style.paddingTop = (currentBodyPadding + bannerHeight) + 'px';
 }
 
 // Hide viewing mode banner
@@ -2936,18 +2925,6 @@ function hideViewingModeBanner() {
     const banner = document.getElementById('viewing-mode-banner');
     if (banner) {
         banner.remove();
-        
-        // Reset container margin
-        const container = document.querySelector('.container');
-        if (container) {
-            container.style.marginTop = '';
-        }
-        
-        // Reset body padding (remove only the banner height portion)
-        const currentBodyPadding = parseInt(window.getComputedStyle(document.body).paddingTop) || 0;
-        const bannerHeight = banner.offsetHeight || 60;
-        const newPadding = Math.max(20, currentBodyPadding - bannerHeight);
-        document.body.style.paddingTop = newPadding + 'px';
     }
 }
 
