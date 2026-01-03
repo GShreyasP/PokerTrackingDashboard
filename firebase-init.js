@@ -48,10 +48,13 @@ async function initFirebase() {
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
                 
-                // Show friends button only after authenticated view is shown
-                if (window.showFriendsButton) {
-                    window.showFriendsButton();
-                }
+                // Show friends button only after authenticated view is shown and auth page is hidden
+                // Use setTimeout to ensure auth page is hidden first
+                setTimeout(() => {
+                    if (window.showFriendsButton) {
+                        window.showFriendsButton();
+                    }
+                }, 100);
                 
                 // Check for friend request notifications
                 if (window.checkFriendRequestNotifications) {
