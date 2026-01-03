@@ -3600,6 +3600,12 @@ async function loadUserTracker(trackerId) {
         const mainScreen = document.getElementById('main-screen');
         const setupSection = document.getElementById('setup-section');
         const trackingSection = document.getElementById('tracking-section');
+        const backToHomeBtn = document.getElementById('back-to-main-btn');
+        
+        // Show back to home button when viewing a tracker
+        if (backToHomeBtn && window.currentUser) {
+            backToHomeBtn.classList.remove('hidden');
+        }
         
         if (mainScreen) mainScreen.classList.add('hidden');
         if (setupSection) setupSection.classList.add('hidden');
