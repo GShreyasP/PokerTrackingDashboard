@@ -163,12 +163,17 @@ function restoreState(parsed) {
 // Save viewing state to localStorage
 function saveViewingState() {
     try {
+        // Check if we're on main screen
+        const mainScreen = document.getElementById('main-screen');
+        const isOnMainScreen = mainScreen && !mainScreen.classList.contains('hidden');
+        
         const viewingState = {
             isViewingFriendTracker: trackerViewState.isViewingFriendTracker,
             viewingTrackerOwnerId: trackerViewState.viewingTrackerOwnerId,
             hasEditAccess: trackerViewState.hasEditAccess,
             isOwner: trackerViewState.isOwner,
-            currentTrackerId: state.trackerId // Save current tracker ID if viewing own tracker
+            currentTrackerId: state.trackerId, // Save current tracker ID if viewing own tracker
+            isOnMainScreen: isOnMainScreen // Save if we're on main screen
         };
         localStorage.setItem('pokerViewingState', JSON.stringify(viewingState));
     } catch (error) {
@@ -218,8 +223,16 @@ async function loadUserData(userId) {
     }
     
     try {
-        // First check if we were viewing a friend's tracker
+        // First check if we were on main screen
         const savedViewingState = loadViewingState();
+        if (savedViewingState && savedViewingState.isOnMainScreen) {
+            // User was on main screen, stay there
+            console.log('Restoring main screen view');
+            await showMainScreen();
+            return;
+        }
+        
+        // Check if we were viewing a friend's tracker
         if (savedViewingState && savedViewingState.isViewingFriendTracker && savedViewingState.viewingTrackerOwnerId) {
             // Restore friend tracker view
             console.log('Restoring friend tracker view:', savedViewingState.viewingTrackerOwnerId);
@@ -278,6 +291,7 @@ async function loadUserData(userId) {
         }
         
         // Normal load - check user's own data
+        // Only auto-load tracker if we weren't on main screen
         const docRef = window.firebaseDb.collection('users').doc(userId);
         const doc = await docRef.get();
         
@@ -286,34 +300,62 @@ async function loadUserData(userId) {
             
             // Check if user has trackers array (new multi-tracker system)
             if (data.trackers && data.trackers.length > 0) {
-                // Load the most recently updated tracker
-                const sortedTrackers = data.trackers.sort((a, b) => {
-                    const dateA = new Date(a.updatedAt || 0);
-                    const dateB = new Date(b.updatedAt || 0);
-                    return dateB - dateA;
-                });
-                
-                const latestTracker = sortedTrackers[0];
-                restoreState(latestTracker.state);
-                state.trackerId = latestTracker.id;
-                state.trackerName = latestTracker.name;
-                
-                // Store all trackers
-                userTrackers = data.trackers;
-                
-                // Save viewing state (viewing own tracker)
-                trackerViewState.isViewingFriendTracker = false;
-                trackerViewState.isOwner = true;
-                saveViewingState();
+                // Only auto-load if we weren't on main screen
+                if (!savedViewingState || !savedViewingState.isOnMainScreen) {
+                    // Load the most recently updated tracker
+                    const sortedTrackers = data.trackers.sort((a, b) => {
+                        const dateA = new Date(a.updatedAt || 0);
+                        const dateB = new Date(b.updatedAt || 0);
+                        return dateB - dateA;
+                    });
+                    
+                    const latestTracker = sortedTrackers[0];
+                    restoreState(latestTracker.state);
+                    state.trackerId = latestTracker.id;
+                    state.trackerName = latestTracker.name;
+                    
+                    // Store all trackers
+                    userTrackers = data.trackers;
+                    
+                    // Save viewing state (viewing own tracker)
+                    trackerViewState.isViewingFriendTracker = false;
+                    trackerViewState.isOwner = true;
+                    saveViewingState();
+                } else {
+                    // User was on main screen, show it
+                    userTrackers = data.trackers;
+                    await showMainScreen();
+                }
             } else if (data.state) {
                 // Fallback to old single-tracker system
-                restoreState(data.state);
+                // Only auto-load if we weren't on main screen
+                if (!savedViewingState || !savedViewingState.isOnMainScreen) {
+                    restoreState(data.state);
+                    // Save viewing state (viewing own tracker)
+                    trackerViewState.isViewingFriendTracker = false;
+                    trackerViewState.isOwner = true;
+                    saveViewingState();
+                } else {
+                    // User was on main screen, show it
+                    await showMainScreen();
+                }
             } else {
                 // No data in Firestore, try localStorage
                 const hasLocalData = loadState();
                 // If no local data either, show main screen
                 if (!hasLocalData) {
                     await showMainScreen();
+                } else {
+                    // We loaded data, but only if we weren't on main screen
+                    if (!savedViewingState || !savedViewingState.isOnMainScreen) {
+                        // Save viewing state
+                        trackerViewState.isViewingFriendTracker = false;
+                        trackerViewState.isOwner = true;
+                        saveViewingState();
+                    } else {
+                        // User was on main screen, show it
+                        await showMainScreen();
+                    }
                 }
             }
         } else {
@@ -322,6 +364,17 @@ async function loadUserData(userId) {
             // If no local data either, show main screen
             if (!hasLocalData) {
                 await showMainScreen();
+            } else {
+                // We loaded data, but only if we weren't on main screen
+                if (!savedViewingState || !savedViewingState.isOnMainScreen) {
+                    // Save viewing state
+                    trackerViewState.isViewingFriendTracker = false;
+                    trackerViewState.isOwner = true;
+                    saveViewingState();
+                } else {
+                    // User was on main screen, show it
+                    await showMainScreen();
+                }
             }
         }
     } catch (error) {
