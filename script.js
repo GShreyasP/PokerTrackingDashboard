@@ -142,6 +142,11 @@ function restoreState(parsed) {
         // Update UI based on viewing mode
         const hasEditAccess = trackerViewState.isOwner || trackerViewState.hasEditAccess;
         updateUIForViewingMode(hasEditAccess);
+        
+        // Save viewing state if viewing own tracker
+        if (!trackerViewState.isViewingFriendTracker && state.trackerId) {
+            saveViewingState();
+        }
     } else {
         // No data, show main screen
         mainScreen.classList.remove('hidden');
@@ -155,15 +160,124 @@ function restoreState(parsed) {
     }
 }
 
+// Save viewing state to localStorage
+function saveViewingState() {
+    try {
+        const viewingState = {
+            isViewingFriendTracker: trackerViewState.isViewingFriendTracker,
+            viewingTrackerOwnerId: trackerViewState.viewingTrackerOwnerId,
+            hasEditAccess: trackerViewState.hasEditAccess,
+            isOwner: trackerViewState.isOwner,
+            currentTrackerId: state.trackerId // Save current tracker ID if viewing own tracker
+        };
+        localStorage.setItem('pokerViewingState', JSON.stringify(viewingState));
+    } catch (error) {
+        console.error('Error saving viewing state:', error);
+    }
+}
+
+// Load viewing state from localStorage
+function loadViewingState() {
+    try {
+        const savedState = localStorage.getItem('pokerViewingState');
+        if (savedState) {
+            const parsed = JSON.parse(savedState);
+            return parsed;
+        }
+    } catch (error) {
+        console.error('Error loading viewing state:', error);
+    }
+    return null;
+}
+
+// Clear viewing state from localStorage
+function clearViewingState() {
+    try {
+        localStorage.removeItem('pokerViewingState');
+    } catch (error) {
+        console.error('Error clearing viewing state:', error);
+    }
+}
+
 // Load user data from Firestore
 async function loadUserData(userId) {
     if (!window.firebaseDb || !window.firebaseReady) {
         // Firebase not ready, use localStorage
         loadState();
+        // Check for saved viewing state
+        const savedViewingState = loadViewingState();
+        if (savedViewingState && savedViewingState.isViewingFriendTracker && savedViewingState.viewingTrackerOwnerId) {
+            // Restore friend tracker view
+            try {
+                await viewFriendTracker(savedViewingState.viewingTrackerOwnerId);
+            } catch (error) {
+                console.error('Error restoring friend tracker view:', error);
+            }
+        }
         return;
     }
     
     try {
+        // First check if we were viewing a friend's tracker
+        const savedViewingState = loadViewingState();
+        if (savedViewingState && savedViewingState.isViewingFriendTracker && savedViewingState.viewingTrackerOwnerId) {
+            // Restore friend tracker view
+            console.log('Restoring friend tracker view:', savedViewingState.viewingTrackerOwnerId);
+            try {
+                await viewFriendTracker(savedViewingState.viewingTrackerOwnerId);
+                return; // Successfully restored, exit
+            } catch (error) {
+                console.error('Error restoring friend tracker view:', error);
+                // If restoration fails, continue to load own data
+            }
+        }
+        
+        // Check if we were viewing our own tracker
+        if (savedViewingState && savedViewingState.currentTrackerId && !savedViewingState.isViewingFriendTracker) {
+            // Try to load the specific tracker
+            const docRef = window.firebaseDb.collection('users').doc(userId);
+            const doc = await docRef.get();
+            
+            if (doc.exists && doc.data().trackers) {
+                const trackers = doc.data().trackers;
+                const tracker = trackers.find(t => t.id === savedViewingState.currentTrackerId);
+                
+                if (tracker) {
+                    restoreState(tracker.state);
+                    state.trackerId = tracker.id;
+                    state.trackerName = tracker.name;
+                    
+                    // Update viewing state
+                    trackerViewState.isViewingFriendTracker = false;
+                    trackerViewState.isOwner = true;
+                    trackerViewState.viewingTrackerOwnerId = null;
+                    trackerViewState.hasEditAccess = false;
+                    
+                    // Show tracking section
+                    const mainScreen = document.getElementById('main-screen');
+                    const setupSection = document.getElementById('setup-section');
+                    const trackingSection = document.getElementById('tracking-section');
+                    
+                    if (mainScreen) mainScreen.classList.add('hidden');
+                    if (setupSection) setupSection.classList.add('hidden');
+                    if (trackingSection) trackingSection.classList.remove('hidden');
+                    
+                    renderPeopleWidgets();
+                    updateTotalPot();
+                    updateChipValueDisplay();
+                    updateTotalChips();
+                    renderLog();
+                    
+                    updateUIForViewingMode(true);
+                    
+                    // Save viewing state
+                    saveViewingState();
+                    return; // Successfully restored, exit
+                }
+            }
+        }
+        
+        // Normal load - check user's own data
         const docRef = window.firebaseDb.collection('users').doc(userId);
         const doc = await docRef.get();
         
@@ -186,6 +300,11 @@ async function loadUserData(userId) {
                 
                 // Store all trackers
                 userTrackers = data.trackers;
+                
+                // Save viewing state (viewing own tracker)
+                trackerViewState.isViewingFriendTracker = false;
+                trackerViewState.isOwner = true;
+                saveViewingState();
             } else if (data.state) {
                 // Fallback to old single-tracker system
                 restoreState(data.state);
@@ -217,6 +336,13 @@ async function loadUserData(userId) {
 
 // Show main screen
 async function showMainScreen() {
+    // Clear viewing state when going to main screen
+    clearViewingState();
+    trackerViewState.isViewingFriendTracker = false;
+    trackerViewState.viewingTrackerOwnerId = null;
+    trackerViewState.hasEditAccess = false;
+    trackerViewState.isOwner = true;
+    
     const mainScreen = document.getElementById('main-screen');
     const setupSection = document.getElementById('setup-section');
     const trackingSection = document.getElementById('tracking-section');
@@ -2709,12 +2835,32 @@ async function viewFriendTracker(friendId) {
         
         // Load friend's tracker data
         const userDoc = await window.firebaseDb.collection('users').doc(friendId).get();
-        if (!userDoc.exists || !userDoc.data().state) {
-            alert('Friend does not have an active tracker.');
+        if (!userDoc.exists) {
+            showAlertModal('Friend does not have an active tracker.');
             return;
         }
         
-        const friendState = userDoc.data().state;
+        const userData = userDoc.data();
+        let friendState = null;
+        
+        // Check for trackers array first (new multi-tracker system)
+        if (userData.trackers && userData.trackers.length > 0) {
+            // Load the most recently updated tracker
+            const sortedTrackers = userData.trackers.sort((a, b) => {
+                const dateA = new Date(a.updatedAt || 0);
+                const dateB = new Date(b.updatedAt || 0);
+                return dateB - dateA;
+            });
+            friendState = sortedTrackers[0].state;
+        } else if (userData.state) {
+            // Fallback to old single-tracker system
+            friendState = userData.state;
+        }
+        
+        if (!friendState) {
+            showAlertModal('Friend does not have an active tracker.');
+            return;
+        }
         
         // Check if user has edit access
         const accessRef = window.firebaseDb.collection('trackerAccess');
@@ -2734,6 +2880,9 @@ async function viewFriendTracker(friendId) {
         trackerViewState.viewingTrackerOwnerId = friendId;
         trackerViewState.hasEditAccess = hasEditAccess;
         trackerViewState.isOwner = false;
+        
+        // Save viewing state to localStorage for page reload
+        saveViewingState();
         
         // Restore friend's state
         restoreState(friendState);
@@ -3106,7 +3255,7 @@ async function declineJoinRequest(requestId) {
 // Return to own tracker
 async function returnToOwnTracker() {
     if (!window.firebaseDb || !window.currentUser) return;
-    
+
     try {
         // If we have saved state, restore it (faster)
         if (trackerViewState.ownTrackerState) {
@@ -3116,16 +3265,19 @@ async function returnToOwnTracker() {
             // Otherwise load from Firestore
             await loadUserData(window.currentUser.uid);
         }
-        
+
         // Reset viewing state
         trackerViewState.isViewingFriendTracker = false;
         trackerViewState.viewingTrackerOwnerId = null;
         trackerViewState.hasEditAccess = false;
         trackerViewState.isOwner = true;
         
+        // Save viewing state (now viewing own tracker)
+        saveViewingState();
+
         // Update UI for owner mode
         updateUIForViewingMode(true);
-        
+
         // Hide viewing mode banner
         hideViewingModeBanner();
     } catch (error) {
@@ -3329,6 +3481,15 @@ async function loadUserTracker(trackerId) {
         state.trackerId = tracker.id;
         state.trackerName = tracker.name;
         
+        // Update viewing state
+        trackerViewState.isViewingFriendTracker = false;
+        trackerViewState.isOwner = true;
+        trackerViewState.viewingTrackerOwnerId = null;
+        trackerViewState.hasEditAccess = false;
+        
+        // Save viewing state (viewing own tracker)
+        saveViewingState();
+        
         // Show tracking section
         const mainScreen = document.getElementById('main-screen');
         const setupSection = document.getElementById('setup-section');
@@ -3346,8 +3507,6 @@ async function loadUserTracker(trackerId) {
         renderLog();
         
         // Update UI based on viewing mode
-        trackerViewState.isViewingFriendTracker = false;
-        trackerViewState.isOwner = true;
         updateUIForViewingMode(true);
     } catch (error) {
         console.error('Error loading user tracker:', error);
