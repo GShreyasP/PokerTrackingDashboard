@@ -95,6 +95,17 @@ service cloud.firestore {
       // Tracker owners can update edit requests for their tracker (to approve/decline)
       allow update: if isAuthenticated() && resource.data.trackerOwnerId == request.auth.uid;
     }
+    
+    // Tracker Join Requests collection - NEW for joining tracker as a person
+    match /trackerJoinRequests/{requestId} {
+      // Users can read requests where they are the tracker owner or requester
+      allow read: if isAuthenticated() && 
+        (resource.data.trackerOwnerId == request.auth.uid || resource.data.requesterId == request.auth.uid);
+      // Users can create join requests (requesting to join as a person)
+      allow create: if isAuthenticated() && request.resource.data.requesterId == request.auth.uid;
+      // Tracker owners can update join requests for their tracker (approve/decline)
+      allow update: if isAuthenticated() && resource.data.trackerOwnerId == request.auth.uid;
+    }
   }
 }
 ```
@@ -128,6 +139,11 @@ service cloud.firestore {
    - ✅ Users can read requests where they are the tracker owner or requester
    - ✅ Users can create edit requests (requesting edit access to a tracker)
    - ✅ Tracker owners can update edit requests (to approve/decline)
+
+7. **Tracker Join Requests** (NEW - for joining tracker as a person):
+   - ✅ Users can read requests where they are the tracker owner or requester
+   - ✅ Users can create join requests (requesting to join tracker as a person with money)
+   - ✅ Tracker owners can update join requests (to approve/decline)
 
 ### Security Note:
 These rules allow reading user emails/names for friend search. If you want stricter privacy, you could:
