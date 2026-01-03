@@ -15,6 +15,14 @@ let state = {
     transactions: []
 };
 
+// Tracker viewing state
+let trackerViewState = {
+    isViewingFriendTracker: false,
+    viewingTrackerOwnerId: null,
+    hasEditAccess: false,
+    isOwner: true
+};
+
 // DOM Elements
 const setupSection = document.getElementById('setup-section');
 const trackingSection = document.getElementById('tracking-section');
@@ -84,6 +92,10 @@ function restoreState(parsed) {
         updateChipValueDisplay();
         updateTotalChips();
         renderLog();
+        
+        // Update UI based on viewing mode
+        const hasEditAccess = trackerViewState.isOwner || trackerViewState.hasEditAccess;
+        updateUIForViewingMode(hasEditAccess);
     } else {
         // No data, show setup section
         setupSection.classList.remove('hidden');
@@ -134,6 +146,31 @@ function showSetupSection() {
 
 // Save state to Firestore (if signed in) or localStorage (fallback)
 async function saveState() {
+    // Don't save if viewing friend's tracker and don't have edit access
+    if (trackerViewState.isViewingFriendTracker && !trackerViewState.hasEditAccess) {
+        console.log('Cannot save: viewing friend tracker in read-only mode');
+        return;
+    }
+    
+    // If viewing friend's tracker with edit access, save to friend's document
+    if (trackerViewState.isViewingFriendTracker && trackerViewState.hasEditAccess && trackerViewState.viewingTrackerOwnerId) {
+        if (window.firebaseDb && window.firebaseReady) {
+            try {
+                const ownerId = trackerViewState.viewingTrackerOwnerId;
+                const docRef = window.firebaseDb.collection('users').doc(ownerId);
+                await docRef.set({
+                    state: state,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                return;
+            } catch (error) {
+                console.error('Error saving friend tracker state:', error);
+                alert('Error saving changes. Please try again.');
+                return;
+            }
+        }
+    }
+    
     // If user is signed in, save to Firestore
     if (window.currentUser && window.firebaseDb && window.firebaseReady) {
         try {
@@ -142,7 +179,7 @@ async function saveState() {
             await docRef.set({
                 state: state,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            }, { merge: true });
         } catch (error) {
             console.error('Error saving to Firestore:', error);
             // Fall back to localStorage
@@ -1347,7 +1384,7 @@ let onlineStatusListeners = [];
 function toggleFriendsSidebar() {
     const sidebar = document.getElementById('friends-sidebar');
     const overlay = document.getElementById('sidebar-overlay');
-    
+
     if (sidebar && overlay) {
         const isHidden = sidebar.classList.contains('hidden');
         if (isHidden) {
@@ -1355,6 +1392,7 @@ function toggleFriendsSidebar() {
             overlay.classList.remove('hidden');
             loadFriendsList();
             loadFriendRequests();
+            loadTrackerAccessRequests();
         } else {
             sidebar.classList.add('hidden');
             overlay.classList.add('hidden');
@@ -1801,38 +1839,89 @@ async function loadFriendsList() {
         const onlineFriends = friends.filter(f => f.isOnline);
         const offlineFriends = friends.filter(f => !f.isOnline);
         
+        // Check if current user has active tracker
+        const hasActiveTracker = state.people && state.people.length > 0;
+        
         // Render online friends
         if (onlineFriends.length === 0) {
             onlineList.innerHTML = '<p class="no-friends">No online friends</p>';
         } else {
-            onlineList.innerHTML = onlineFriends.map(friend => `
-                <div class="friend-item">
-                    <div class="friend-item-info">
-                        <div class="friend-item-avatar">${friend.name.charAt(0).toUpperCase()}</div>
-                        <div class="friend-item-details">
-                            <div class="friend-item-name">${friend.name}</div>
-                            <div class="friend-item-status online">Online</div>
+            onlineList.innerHTML = await Promise.all(onlineFriends.map(async (friend) => {
+                const hasTracker = await checkFriendHasTracker(friend.id);
+                const hasAccess = await checkTrackerAccess(friend.id);
+                const hasEditAccess = await checkFriendEditAccess(friend.id);
+                
+                // If viewing own tracker, show option to grant edit access
+                const isOwnTracker = !trackerViewState.isViewingFriendTracker;
+                
+                return `
+                    <div class="friend-item" data-friend-id="${friend.id}">
+                        <div class="friend-item-info" onclick="showFriendTrackerOptions('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')">
+                            <div class="friend-item-avatar">${friend.name.charAt(0).toUpperCase()}</div>
+                            <div class="friend-item-details">
+                                <div class="friend-item-name">${friend.name}</div>
+                                <div class="friend-item-status online">Online</div>
+                            </div>
+                        </div>
+                        <div class="friend-item-actions">
+                            ${hasActiveTracker && isOwnTracker ? `
+                                ${hasEditAccess ? `
+                                    <span style="font-size: 0.85em; color: #28a745; margin-right: 10px;">Can Edit</span>
+                                ` : `
+                                    <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); grantFriendEditAccess('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')">Grant Edit Access</button>
+                                `}
+                            ` : hasTracker ? `
+                                ${hasAccess ? `
+                                    <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); viewFriendTracker('${friend.id}')">View Tracker</button>
+                                ` : `
+                                    <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); joinFriendTracker('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')">Join Tracker</button>
+                                `}
+                            ` : ''}
                         </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            })).then(results => results.join(''));
         }
         
         // Render offline friends
         if (offlineFriends.length === 0) {
             offlineList.innerHTML = '<p class="no-friends">No offline friends</p>';
         } else {
-            offlineList.innerHTML = offlineFriends.map(friend => `
-                <div class="friend-item">
-                    <div class="friend-item-info">
-                        <div class="friend-item-avatar">${friend.name.charAt(0).toUpperCase()}</div>
-                        <div class="friend-item-details">
-                            <div class="friend-item-name">${friend.name}</div>
-                            <div class="friend-item-status offline">Offline</div>
+            offlineList.innerHTML = await Promise.all(offlineFriends.map(async (friend) => {
+                const hasTracker = await checkFriendHasTracker(friend.id);
+                const hasAccess = await checkTrackerAccess(friend.id);
+                const hasEditAccess = await checkFriendEditAccess(friend.id);
+                
+                // If viewing own tracker, show option to grant edit access
+                const isOwnTracker = !trackerViewState.isViewingFriendTracker;
+                
+                return `
+                    <div class="friend-item" data-friend-id="${friend.id}">
+                        <div class="friend-item-info" onclick="showFriendTrackerOptions('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')">
+                            <div class="friend-item-avatar">${friend.name.charAt(0).toUpperCase()}</div>
+                            <div class="friend-item-details">
+                                <div class="friend-item-name">${friend.name}</div>
+                                <div class="friend-item-status offline">Offline</div>
+                            </div>
+                        </div>
+                        <div class="friend-item-actions">
+                            ${hasActiveTracker && isOwnTracker ? `
+                                ${hasEditAccess ? `
+                                    <span style="font-size: 0.85em; color: #28a745; margin-right: 10px;">Can Edit</span>
+                                ` : `
+                                    <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); grantFriendEditAccess('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')">Grant Edit Access</button>
+                                `}
+                            ` : hasTracker ? `
+                                ${hasAccess ? `
+                                    <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); viewFriendTracker('${friend.id}')">View Tracker</button>
+                                ` : `
+                                    <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); joinFriendTracker('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')">Join Tracker</button>
+                                `}
+                            ` : ''}
                         </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            })).then(results => results.join(''));
         }
         
         // Set up real-time listeners for online status
@@ -1909,6 +1998,481 @@ async function updateOnlineStatus(isOnline) {
     }
 }
 
+// Check if friend has an active tracker
+async function checkFriendHasTracker(friendId) {
+    if (!window.firebaseDb) return false;
+    try {
+        const userDoc = await window.firebaseDb.collection('users').doc(friendId).get();
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            return userData.state && userData.state.people && userData.state.people.length > 0;
+        }
+    } catch (error) {
+        console.error('Error checking friend tracker:', error);
+    }
+    return false;
+}
+
+// Check if user has access to friend's tracker
+async function checkTrackerAccess(friendId) {
+    if (!window.firebaseDb || !window.currentUser) return false;
+    try {
+        const currentUserId = window.currentUser.uid;
+        const accessRef = window.firebaseDb.collection('trackerAccess');
+        const snapshot = await accessRef
+            .where('trackerOwnerId', '==', friendId)
+            .where('userId', '==', currentUserId)
+            .where('status', '==', 'active')
+            .get();
+        return !snapshot.empty;
+    } catch (error) {
+        console.error('Error checking tracker access:', error);
+    }
+    return false;
+}
+
+// Check if friend has edit access to current user's tracker
+async function checkFriendEditAccess(friendId) {
+    if (!window.firebaseDb || !window.currentUser) return false;
+    try {
+        const currentUserId = window.currentUser.uid;
+        const accessRef = window.firebaseDb.collection('trackerAccess');
+        const snapshot = await accessRef
+            .where('trackerOwnerId', '==', currentUserId)
+            .where('userId', '==', friendId)
+            .where('status', '==', 'active')
+            .where('hasEditAccess', '==', true)
+            .get();
+        return !snapshot.empty;
+    } catch (error) {
+        console.error('Error checking friend edit access:', error);
+    }
+    return false;
+}
+
+// Grant friend edit access to current user's tracker
+async function grantFriendEditAccess(friendId, friendName) {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const currentUserId = window.currentUser.uid;
+    
+    try {
+        // Check if access already exists
+        const accessRef = window.firebaseDb.collection('trackerAccess');
+        const accessSnapshot = await accessRef
+            .where('trackerOwnerId', '==', currentUserId)
+            .where('userId', '==', friendId)
+            .where('status', '==', 'active')
+            .get();
+        
+        if (!accessSnapshot.empty) {
+            // Update existing access
+            const accessDoc = accessSnapshot.docs[0];
+            await accessDoc.ref.update({
+                hasEditAccess: true
+            });
+        } else {
+            // Create new access with edit permissions
+            await accessRef.add({
+                trackerOwnerId: currentUserId,
+                userId: friendId,
+                status: 'active',
+                hasEditAccess: true,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+        
+        // Update any pending requests
+        const requestsRef = window.firebaseDb.collection('trackerEditRequests');
+        const requestSnapshot = await requestsRef
+            .where('trackerOwnerId', '==', currentUserId)
+            .where('requesterId', '==', friendId)
+            .where('status', '==', 'pending')
+            .get();
+        
+        for (const doc of requestSnapshot.docs) {
+            await doc.ref.update({ status: 'granted' });
+        }
+        
+        alert('Edit access granted to ' + friendName + '!');
+        
+        // Reload friends list
+        loadFriendsList();
+        loadTrackerAccessRequests();
+    } catch (error) {
+        console.error('Error granting friend edit access:', error);
+        alert('Error granting access. Please try again.');
+    }
+}
+
+// Show friend tracker options modal
+function showFriendTrackerOptions(friendId, friendName) {
+    // This can be expanded to show more options
+    // For now, clicking on friend info just selects them
+}
+
+// Join friend's tracker (read-only access)
+async function joinFriendTracker(friendId, friendName) {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const currentUserId = window.currentUser.uid;
+    
+    try {
+        // Check if access already exists
+        const existingAccess = await checkTrackerAccess(friendId);
+        if (existingAccess) {
+            await viewFriendTracker(friendId);
+            return;
+        }
+        
+        // Create read-only access
+        const accessRef = window.firebaseDb.collection('trackerAccess');
+        await accessRef.add({
+            trackerOwnerId: friendId,
+            userId: currentUserId,
+            status: 'active',
+            hasEditAccess: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Load friend's tracker
+        await viewFriendTracker(friendId);
+    } catch (error) {
+        console.error('Error joining friend tracker:', error);
+        alert('Error joining tracker. Please try again.');
+    }
+}
+
+// View friend's tracker
+async function viewFriendTracker(friendId) {
+    if (!window.firebaseDb) return;
+    
+    try {
+        // Check access
+        const hasAccess = await checkTrackerAccess(friendId);
+        if (!hasAccess) {
+            alert('You need to join the tracker first.');
+            return;
+        }
+        
+        // Load friend's tracker data
+        const userDoc = await window.firebaseDb.collection('users').doc(friendId).get();
+        if (!userDoc.exists || !userDoc.data().state) {
+            alert('Friend does not have an active tracker.');
+            return;
+        }
+        
+        const friendState = userDoc.data().state;
+        
+        // Check if user has edit access
+        const accessRef = window.firebaseDb.collection('trackerAccess');
+        const accessSnapshot = await accessRef
+            .where('trackerOwnerId', '==', friendId)
+            .where('userId', '==', window.currentUser.uid)
+            .where('status', '==', 'active')
+            .get();
+        
+        let hasEditAccess = false;
+        if (!accessSnapshot.empty) {
+            hasEditAccess = accessSnapshot.docs[0].data().hasEditAccess === true;
+        }
+        
+        // Set viewing state
+        trackerViewState.isViewingFriendTracker = true;
+        trackerViewState.viewingTrackerOwnerId = friendId;
+        trackerViewState.hasEditAccess = hasEditAccess;
+        trackerViewState.isOwner = false;
+        
+        // Restore friend's state
+        restoreState(friendState);
+        
+        // Update UI for read-only mode
+        updateUIForViewingMode(hasEditAccess);
+        
+        // Close friends sidebar
+        toggleFriendsSidebar();
+        
+        // Show banner indicating viewing mode
+        showViewingModeBanner(friendId, hasEditAccess);
+    } catch (error) {
+        console.error('Error viewing friend tracker:', error);
+        alert('Error loading friend tracker. Please try again.');
+    }
+}
+
+// Request editing access
+async function requestEditingAccess(friendId, friendName) {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const currentUserId = window.currentUser.uid;
+    
+    try {
+        // Check if request already exists
+        const requestsRef = window.firebaseDb.collection('trackerEditRequests');
+        const existingRequest = await requestsRef
+            .where('trackerOwnerId', '==', friendId)
+            .where('requesterId', '==', currentUserId)
+            .where('status', '==', 'pending')
+            .get();
+        
+        if (!existingRequest.empty) {
+            alert('You have already requested editing access.');
+            return;
+        }
+        
+        // Create edit access request
+        await requestsRef.add({
+            trackerOwnerId: friendId,
+            requesterId: currentUserId,
+            status: 'pending',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        alert('Edit access request sent to ' + friendName + '!');
+        
+        // Reload tracker access requests
+        loadTrackerAccessRequests();
+    } catch (error) {
+        console.error('Error requesting editing access:', error);
+        alert('Error sending request. Please try again.');
+    }
+}
+
+// Load tracker access requests
+async function loadTrackerAccessRequests() {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const currentUserId = window.currentUser.uid;
+    const requestsSection = document.getElementById('tracker-access-requests-section');
+    const requestsList = document.getElementById('tracker-access-requests-list');
+    
+    try {
+        // Get requests where current user is the tracker owner
+        const requestsRef = window.firebaseDb.collection('trackerEditRequests');
+        const snapshot = await requestsRef
+            .where('trackerOwnerId', '==', currentUserId)
+            .where('status', '==', 'pending')
+            .get();
+        
+        if (snapshot.empty) {
+            requestsSection.classList.add('hidden');
+            return;
+        }
+        
+        requestsSection.classList.remove('hidden');
+        
+        const requests = [];
+        for (const doc of snapshot.docs) {
+            const requestData = doc.data();
+            const requesterId = requestData.requesterId;
+            
+            // Get requester info
+            const userDoc = await window.firebaseDb.collection('users').doc(requesterId).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                requests.push({
+                    id: doc.id,
+                    requesterId: requesterId,
+                    name: userData.displayName || userData.name || userData.email || 'Unknown',
+                    email: userData.email || ''
+                });
+            }
+        }
+        
+        if (requests.length === 0) {
+            requestsSection.classList.add('hidden');
+            return;
+        }
+        
+        requestsList.innerHTML = requests.map(request => `
+            <div class="friend-request-item">
+                <div class="friend-search-result-info">
+                    <div class="friend-search-result-name">${request.name}</div>
+                    <div style="font-size: 0.85em; color: #666;">wants edit access to your tracker</div>
+                </div>
+                <div class="friend-request-actions">
+                    <button class="btn-accept" onclick="grantEditingAccess('${request.id}', '${request.requesterId}')">Grant</button>
+                    <button class="btn-decline" onclick="declineEditingAccess('${request.id}')">Decline</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading tracker access requests:', error);
+    }
+}
+
+// Grant editing access
+async function grantEditingAccess(requestId, requesterId) {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const currentUserId = window.currentUser.uid;
+    
+    try {
+        // Update the access record to grant edit access
+        const accessRef = window.firebaseDb.collection('trackerAccess');
+        const accessSnapshot = await accessRef
+            .where('trackerOwnerId', '==', currentUserId)
+            .where('userId', '==', requesterId)
+            .where('status', '==', 'active')
+            .get();
+        
+        if (!accessSnapshot.empty) {
+            // Update existing access
+            const accessDoc = accessSnapshot.docs[0];
+            await accessDoc.ref.update({
+                hasEditAccess: true
+            });
+        } else {
+            // Create new access with edit permissions
+            await accessRef.add({
+                trackerOwnerId: currentUserId,
+                userId: requesterId,
+                status: 'active',
+                hasEditAccess: true,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+        
+        // Update request status
+        const requestRef = window.firebaseDb.collection('trackerEditRequests').doc(requestId);
+        await requestRef.update({ status: 'granted' });
+        
+        // Reload requests
+        loadTrackerAccessRequests();
+        
+        alert('Edit access granted!');
+    } catch (error) {
+        console.error('Error granting editing access:', error);
+        alert('Error granting access. Please try again.');
+    }
+}
+
+// Decline editing access request
+async function declineEditingAccess(requestId) {
+    if (!window.firebaseDb) return;
+    
+    try {
+        const requestRef = window.firebaseDb.collection('trackerEditRequests').doc(requestId);
+        await requestRef.update({ status: 'declined' });
+        
+        loadTrackerAccessRequests();
+    } catch (error) {
+        console.error('Error declining editing access request:', error);
+        alert('Error declining request. Please try again.');
+    }
+}
+
+// Return to own tracker
+async function returnToOwnTracker() {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    try {
+        // Reset viewing state
+        trackerViewState.isViewingFriendTracker = false;
+        trackerViewState.viewingTrackerOwnerId = null;
+        trackerViewState.hasEditAccess = false;
+        trackerViewState.isOwner = true;
+        
+        // Load own state
+        await loadUserData(window.currentUser.uid);
+        
+        // Update UI for owner mode
+        updateUIForViewingMode(true);
+        
+        // Hide viewing mode banner
+        hideViewingModeBanner();
+    } catch (error) {
+        console.error('Error returning to own tracker:', error);
+    }
+}
+
+// Update UI for viewing mode (read-only vs editable)
+function updateUIForViewingMode(hasEditAccess) {
+    const canEdit = trackerViewState.isOwner || hasEditAccess;
+    
+    // Disable/enable all action buttons
+    document.querySelectorAll('.btn-add, .btn-remove, .btn-add-person, .btn-settlement').forEach(btn => {
+        if (canEdit) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        } else {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+        }
+    });
+    
+    // Disable/enable forms
+    document.querySelectorAll('#setup-section input, #setup-section button, .widget-form input, .widget-form button').forEach(element => {
+        if (canEdit) {
+            element.disabled = false;
+        } else {
+            element.disabled = true;
+        }
+    });
+}
+
+// Show viewing mode banner
+async function showViewingModeBanner(trackerOwnerId, hasEditAccess) {
+    // Remove existing banner if any
+    hideViewingModeBanner();
+    
+    // Get friend's name
+    let friendName = 'Friend';
+    try {
+        const userDoc = await window.firebaseDb.collection('users').doc(trackerOwnerId).get();
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            friendName = userData.displayName || userData.name || userData.email || 'Friend';
+        }
+    } catch (error) {
+        console.error('Error getting friend name:', error);
+    }
+    
+    const banner = document.createElement('div');
+    banner.id = 'viewing-mode-banner';
+    banner.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px 20px;
+        text-align: center;
+        z-index: 9999;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+    `;
+    
+    const message = hasEditAccess 
+        ? `You are viewing ${friendName}'s tracker with editing access`
+        : `You are viewing ${friendName}'s tracker (read-only)`;
+    
+    banner.innerHTML = `
+        <span style="font-weight: 600;">${message}</span>
+        ${!hasEditAccess ? `<button onclick="requestEditingAccess('${trackerOwnerId}', '${friendName.replace(/'/g, "\\'")}')" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 5px 15px; border-radius: 5px; cursor: pointer; font-weight: 600;">Request Edit Access</button>` : ''}
+        <button onclick="returnToOwnTracker()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 5px 15px; border-radius: 5px; cursor: pointer; font-weight: 600;">Return to My Tracker</button>
+    `;
+    
+    document.body.insertBefore(banner, document.body.firstChild);
+    
+    // Add padding to body to account for banner
+    document.body.style.paddingTop = '60px';
+}
+
+// Hide viewing mode banner
+function hideViewingModeBanner() {
+    const banner = document.getElementById('viewing-mode-banner');
+    if (banner) {
+        banner.remove();
+        document.body.style.paddingTop = '';
+    }
+}
+
 // Make functions globally accessible
 window.showAddForm = showAddForm;
 window.showSubtractForm = showSubtractForm;
@@ -1947,6 +2511,14 @@ window.showFriendsButton = showFriendsButton;
 window.hideFriendsButton = hideFriendsButton;
 window.checkFriendRequestNotifications = checkFriendRequestNotifications;
 window.loadState = loadState; // Make available for firebase-init.js
+window.joinFriendTracker = joinFriendTracker;
+window.viewFriendTracker = viewFriendTracker;
+window.requestEditingAccess = requestEditingAccess;
+window.grantEditingAccess = grantEditingAccess;
+window.declineEditingAccess = declineEditingAccess;
+window.returnToOwnTracker = returnToOwnTracker;
+window.showFriendTrackerOptions = showFriendTrackerOptions;
+window.grantFriendEditAccess = grantFriendEditAccess;
 
 // Initialize on page load
 // Firebase auth state change will handle showing auth page or authenticated content

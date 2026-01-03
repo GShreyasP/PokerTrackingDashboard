@@ -1443,6 +1443,13 @@ h3 {
     display: flex;
     align-items: center;
     gap: 10px;
+    cursor: pointer;
+}
+
+.friend-item-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: 10px;
 }
 
 .friend-item-avatar {
