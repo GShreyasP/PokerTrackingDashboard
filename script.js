@@ -2706,6 +2706,14 @@ async function approveJoinRequest(requestId, requesterId, moneyAmount, requester
             : -1;
         const newPersonId = maxId + 1;
         
+        // Calculate chips based on tracker configuration
+        let chips = 0;
+        if (trackerState.sameValue && trackerState.chipValue > 0) {
+            chips = Math.round(moneyAmount / trackerState.chipValue);
+        } else if (trackerState.sameValue && trackerState.chipsPerStack > 0 && trackerState.stackValue > 0) {
+            chips = Math.round((moneyAmount / trackerState.stackValue) * trackerState.chipsPerStack);
+        }
+        
         // Add new person to tracker
         const newPerson = {
             id: newPersonId,
@@ -2713,7 +2721,7 @@ async function approveJoinRequest(requestId, requesterId, moneyAmount, requester
             moneyPutIn: moneyAmount,
             moneyReturned: 0,
             totalMoney: moneyAmount,
-            chips: 0
+            chips: chips
         };
         
         trackerState.people.push(newPerson);
