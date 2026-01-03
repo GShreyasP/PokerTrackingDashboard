@@ -3423,9 +3423,9 @@ async function loadLiveTables() {
 // Show join tracker modal (request to join)
 function showJoinTrackerModal(friendId, friendName) {
     showAmountInputModal(
-        `Enter the amount of money you want to put in ${friendName}'s tracker:`,
-        (amount) => {
-            requestJoinTracker(friendId, friendName, amount);
+        `Enter the amount of money you want to put in ${friendName}'s tracker (in dollars):`,
+        async (amount) => {
+            await requestJoinTracker(friendId, friendName, amount);
         },
         friendId,
         friendName
@@ -3602,8 +3602,19 @@ function confirmAmountInput() {
     if (callback) {
         console.log('Calling callback with amount:', moneyAmount);
         try {
-            callback(moneyAmount);
-            console.log('Callback executed successfully');
+            // Call the callback - if it's async, handle it properly
+            const result = callback(moneyAmount);
+            if (result && typeof result.then === 'function') {
+                // It's a promise, wait for it and handle errors
+                result.then(() => {
+                    console.log('Async callback completed successfully');
+                }).catch(error => {
+                    console.error('Error in async callback:', error);
+                    showAlertModal('Error processing request: ' + (error.message || 'Unknown error'));
+                });
+            } else {
+                console.log('Callback executed successfully');
+            }
         } catch (error) {
             console.error('Error in callback:', error);
             showAlertModal('Error processing request: ' + (error.message || 'Unknown error'));
