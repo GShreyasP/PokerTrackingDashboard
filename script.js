@@ -2982,12 +2982,8 @@ async function loadLiveTables() {
                 <div class="live-table-info">
                     <h3>${table.friendName}'s Table</h3>
                     <div class="live-table-actions">
-                        ${table.hasAccess ? `
-                            <button class="btn btn-primary" onclick="viewFriendTracker('${table.friendId}')">View Tracker</button>
-                        ` : `
-                            <button class="btn btn-primary" onclick="showJoinTrackerModal('${table.friendId}', '${table.friendName.replace(/'/g, "\\'")}')">Join Tracker</button>
-                            <button class="btn btn-secondary" onclick="viewFriendTracker('${table.friendId}')">View Tracker</button>
-                        `}
+                        <button class="btn btn-primary" onclick="showJoinTrackerModal('${table.friendId}', '${table.friendName.replace(/'/g, "\\'")}')">Join Table</button>
+                        <button class="btn btn-secondary" onclick="viewFriendTracker('${table.friendId}')">View Table</button>
                     </div>
                 </div>
             </div>
