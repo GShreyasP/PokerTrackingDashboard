@@ -1574,15 +1574,25 @@ async function loadFriendRequests() {
             
             // Get user info
             const userDoc = await window.firebaseDb.collection('users').doc(fromUserId).get();
+            let requestName = 'Unknown';
+            let requestEmail = '';
+            
             if (userDoc.exists) {
                 const userData = userDoc.data();
-                requests.push({
-                    id: doc.id,
-                    fromUserId: fromUserId,
-                    name: userData.displayName || userData.name || userData.email || 'Unknown',
-                    email: userData.email || ''
-                });
+                requestEmail = userData.email || '';
+                // Try multiple fallbacks for name
+                requestName = userData.displayName || userData.name || userData.email || fromUserId.substring(0, 8) || 'Unknown';
+            } else {
+                // User document doesn't exist, use user ID as fallback
+                requestName = fromUserId.substring(0, 8) || 'Unknown';
             }
+            
+            requests.push({
+                id: doc.id,
+                fromUserId: fromUserId,
+                name: requestName,
+                email: requestEmail
+            });
         }
         
         // Update notification badge
@@ -1752,18 +1762,39 @@ async function loadFriendsList() {
         const friends = [];
         for (const friendId of friendIds) {
             const userDoc = await window.firebaseDb.collection('users').doc(friendId).get();
+            const onlineStatusDoc = await window.firebaseDb.collection('onlineStatus').doc(friendId).get();
+            const isOnline = onlineStatusDoc.exists && onlineStatusDoc.data().isOnline === true;
+            
+            let friendName = 'Unknown';
+            let friendEmail = '';
+            
             if (userDoc.exists) {
                 const userData = userDoc.data();
-                const onlineStatusDoc = await window.firebaseDb.collection('onlineStatus').doc(friendId).get();
-                const isOnline = onlineStatusDoc.exists && onlineStatusDoc.data().isOnline === true;
+                friendEmail = userData.email || '';
+                // Try multiple fallbacks for name - check all possible fields
+                friendName = userData.displayName || 
+                            userData.name || 
+                            userData.email?.split('@')[0] || // Use part before @ if email exists
+                            friendEmail?.split('@')[0] || 
+                            friendId.substring(0, 8) || 
+                            'Unknown';
                 
-                friends.push({
-                    id: friendId,
-                    name: userData.displayName || userData.name || userData.email || 'Unknown',
-                    email: userData.email || '',
-                    isOnline: isOnline
-                });
+                // Debug logging (can be removed later)
+                if (friendName === 'Unknown' || friendName === friendId.substring(0, 8)) {
+                    console.log('Friend name fallback used for:', friendId, 'UserData:', userData);
+                }
+            } else {
+                // User document doesn't exist, use user ID as fallback
+                friendName = friendId.substring(0, 8) || 'Unknown';
+                console.log('User document not found for friend:', friendId);
             }
+            
+            friends.push({
+                id: friendId,
+                name: friendName,
+                email: friendEmail,
+                isOnline: isOnline
+            });
         }
         
         // Separate online and offline
