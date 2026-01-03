@@ -12,6 +12,13 @@ let state = {
         red: 0,
         blue: 0
     },
+    chipCounts: { // Number of each chip color per stack when different
+        black: 0,
+        white: 0,
+        green: 0,
+        red: 0,
+        blue: 0
+    },
     transactions: []
 };
 
@@ -511,10 +518,23 @@ async function signOut() {
                 red: 0,
                 blue: 0
             },
+            chipCounts: {
+                black: 0,
+                white: 0,
+                green: 0,
+                red: 0,
+                blue: 0
+            },
             transactions: []
         };
         // Clear localStorage
         localStorage.removeItem('pokerTrackerState');
+        
+        // Clean up tracker join requests listener
+        if (window.trackerJoinRequestsListener) {
+            window.trackerJoinRequestsListener();
+            window.trackerJoinRequestsListener = null;
+        }
         
         // Hide friends button
         hideFriendsButton();
@@ -568,6 +588,13 @@ async function resetData() {
                 red: 0,
                 blue: 0
             },
+            chipCounts: {
+                black: 0,
+                white: 0,
+                green: 0,
+                red: 0,
+                blue: 0
+            },
             transactions: []
         };
         
@@ -575,12 +602,26 @@ async function resetData() {
         setupSection.classList.remove('hidden');
         trackingSection.classList.add('hidden');
         
-        // Reset form inputs
-        numPeopleInput.value = 4;
+        // Reset form inputs - use placeholders instead of preset values
+        numPeopleInput.value = '';
         stackValueInput.value = '';
         chipsPerStackInput.value = '';
-        sameValueToggle.checked = true;
+        sameValueToggle.checked = false; // Show chip value options by default
         toggleChipValueMode();
+        
+        // Clear chip value inputs
+        document.getElementById('black-value').value = '';
+        document.getElementById('white-value').value = '';
+        document.getElementById('green-value').value = '';
+        document.getElementById('red-value').value = '';
+        document.getElementById('blue-value').value = '';
+        
+        // Clear chip count inputs
+        document.getElementById('black-count').value = '';
+        document.getElementById('white-count').value = '';
+        document.getElementById('green-count').value = '';
+        document.getElementById('red-count').value = '';
+        document.getElementById('blue-count').value = '';
     }
 }
 
@@ -588,6 +629,7 @@ async function resetData() {
 function toggleChipValueMode() {
     const sameValue = sameValueToggle.checked;
     state.sameValue = sameValue;
+    // Hide chip value options when checkbox is checked (all chips worth the same)
     differentChipsSection.classList.toggle('hidden', sameValue);
 }
 
@@ -598,12 +640,6 @@ function startTracking() {
     const stackValue = parseFloat(stackValueInput.value);
     const chipsPerStack = parseInt(chipsPerStackInput.value);
     const sameValue = sameValueToggle.checked;
-    
-    // Check if checkbox is checked
-    if (!sameValue) {
-        alert('Please check "All chips are worth the same" or configure individual chip values.');
-        return;
-    }
     
     // Validate required fields
     if (!numPeople || numPeople < 1) {
@@ -653,6 +689,15 @@ function startTracking() {
         state.chipValues.green = parseFloat(document.getElementById('green-value').value) || 0;
         state.chipValues.red = parseFloat(document.getElementById('red-value').value) || 0;
         state.chipValues.blue = parseFloat(document.getElementById('blue-value').value) || 0;
+        
+        // Get chip counts per stack
+        state.chipCounts = {
+            black: parseInt(document.getElementById('black-count').value) || 0,
+            white: parseInt(document.getElementById('white-count').value) || 0,
+            green: parseInt(document.getElementById('green-count').value) || 0,
+            red: parseInt(document.getElementById('red-count').value) || 0,
+            blue: parseInt(document.getElementById('blue-count').value) || 0
+        };
     }
     
     // Only create new people if we don't have any yet
@@ -1514,6 +1559,8 @@ function backToSettlementOptions() {
 
 let friendsListeners = [];
 let onlineStatusListeners = [];
+let isLoadingFriendsList = false; // Flag to prevent concurrent calls
+let friendsListLoadTimer = null; // Debounce timer
 
 // Toggle friends sidebar
 function toggleFriendsSidebar() {
@@ -1532,6 +1579,34 @@ function toggleFriendsSidebar() {
         } else {
             sidebar.classList.add('hidden');
             overlay.classList.add('hidden');
+            // Clean up tracker join requests listener when sidebar is closed
+            if (window.trackerJoinRequestsListener) {
+                window.trackerJoinRequestsListener();
+                window.trackerJoinRequestsListener = null;
+            }
+            // Clean up friends list listeners when sidebar is closed
+            friendsListeners.forEach(unsubscribe => {
+                try {
+                    unsubscribe();
+                } catch (e) {
+                    console.error('Error unsubscribing friend listener:', e);
+                }
+            });
+            friendsListeners = [];
+            onlineStatusListeners.forEach(unsubscribe => {
+                try {
+                    unsubscribe();
+                } catch (e) {
+                    console.error('Error unsubscribing online status listener:', e);
+                }
+            });
+            onlineStatusListeners = [];
+            // Clear loading flag and timers
+            isLoadingFriendsList = false;
+            if (friendsListLoadTimer) {
+                clearTimeout(friendsListLoadTimer);
+                friendsListLoadTimer = null;
+            }
         }
     }
 }
@@ -1875,10 +1950,12 @@ async function acceptFriendRequest(requestId, fromUserId) {
         const requestRef = window.firebaseDb.collection('friendRequests').doc(requestId);
         await requestRef.update({ status: 'accepted' });
         
-        // Reload friends list and update notifications
-        loadFriendsList();
-        loadFriendRequests();
-        checkFriendRequestNotifications();
+        // Reload friends list and update notifications (debounced)
+        setTimeout(() => {
+            loadFriendsList();
+            loadFriendRequests();
+            checkFriendRequestNotifications();
+        }, 300);
     } catch (error) {
         console.error('Error accepting friend request:', error);
         alert('Error accepting friend request. Please try again.');
@@ -1901,24 +1978,58 @@ async function declineFriendRequest(requestId) {
     }
 }
 
-// Load friends list
+// Load friends list (with debouncing and concurrent call prevention)
 async function loadFriendsList() {
     if (!window.firebaseDb || !window.currentUser) return;
     
-    // Also check for notifications
-    checkFriendRequestNotifications();
+    // Clear any pending debounce timer
+    if (friendsListLoadTimer) {
+        clearTimeout(friendsListLoadTimer);
+        friendsListLoadTimer = null;
+    }
     
-    const currentUserId = window.currentUser.uid;
-    const onlineList = document.getElementById('online-friends-list');
-    const offlineList = document.getElementById('offline-friends-list');
+    // If already loading, queue another call after current one finishes
+    if (isLoadingFriendsList) {
+        friendsListLoadTimer = setTimeout(() => {
+            loadFriendsList();
+        }, 500);
+        return;
+    }
     
-    // Clear existing listeners
-    friendsListeners.forEach(unsubscribe => unsubscribe());
-    friendsListeners = [];
-    onlineStatusListeners.forEach(unsubscribe => unsubscribe());
-    onlineStatusListeners = [];
+    // Set loading flag
+    isLoadingFriendsList = true;
     
     try {
+        // Also check for notifications
+        checkFriendRequestNotifications();
+        
+        const currentUserId = window.currentUser.uid;
+        const onlineList = document.getElementById('online-friends-list');
+        const offlineList = document.getElementById('offline-friends-list');
+        
+        if (!onlineList || !offlineList) {
+            isLoadingFriendsList = false;
+            return;
+        }
+        
+        // Clear existing listeners
+        friendsListeners.forEach(unsubscribe => {
+            try {
+                unsubscribe();
+            } catch (e) {
+                console.error('Error unsubscribing friend listener:', e);
+            }
+        });
+        friendsListeners = [];
+        onlineStatusListeners.forEach(unsubscribe => {
+            try {
+                unsubscribe();
+            } catch (e) {
+                console.error('Error unsubscribing online status listener:', e);
+            }
+        });
+        onlineStatusListeners = [];
+        
         const friendsRef = window.firebaseDb.collection('friends');
         
         // Get friends where user1 is current user
@@ -1940,6 +2051,7 @@ async function loadFriendsList() {
         if (friendIds.size === 0) {
             onlineList.innerHTML = '<p class="no-friends">No online friends</p>';
             offlineList.innerHTML = '<p class="no-friends">No offline friends</p>';
+            isLoadingFriendsList = false;
             return;
         }
         
@@ -2090,6 +2202,18 @@ async function loadFriendsList() {
         });
     } catch (error) {
         console.error('Error loading friends:', error);
+    } finally {
+        // Always clear loading flag
+        isLoadingFriendsList = false;
+        
+        // If there's a queued call, execute it
+        if (friendsListLoadTimer) {
+            const timer = friendsListLoadTimer;
+            friendsListLoadTimer = null;
+            setTimeout(() => {
+                loadFriendsList();
+            }, 100);
+        }
     }
 }
 
@@ -2148,8 +2272,10 @@ function updateFriendOnlineStatus(friendId, isOnline) {
                 }
             }
         } else {
-            // If item not found, reload the list (shouldn't happen often)
-            loadFriendsList();
+            // If item not found, reload the list (shouldn't happen often) - debounced
+            setTimeout(() => {
+                loadFriendsList();
+            }, 500);
         }
         
         friendStatusUpdateTimer = null;
@@ -2295,9 +2421,11 @@ async function grantFriendEditAccess(friendId, friendName) {
         
         alert('Edit access granted to ' + friendName + '!');
         
-        // Reload friends list
-        loadFriendsList();
-        loadTrackerAccessRequests();
+        // Reload friends list (debounced)
+        setTimeout(() => {
+            loadFriendsList();
+            loadTrackerAccessRequests();
+        }, 300);
     } catch (error) {
         console.error('Error granting friend edit access:', error);
         alert('Error granting access. Please try again.');
@@ -2335,8 +2463,10 @@ async function revokeFriendEditAccess(friendId, friendName) {
             alert('No access record found.');
         }
         
-        // Reload friends list
-        loadFriendsList();
+        // Reload friends list (debounced)
+        setTimeout(() => {
+            loadFriendsList();
+        }, 300);
     } catch (error) {
         console.error('Error revoking friend edit access:', error);
         alert('Error removing edit access. Please try again.');
@@ -2629,8 +2759,8 @@ async function declineEditingAccess(requestId) {
     }
 }
 
-// Load tracker join requests (requests to join tracker as a person)
-async function loadTrackerJoinRequests() {
+// Load tracker join requests (requests to join tracker as a person) - with real-time listener
+function loadTrackerJoinRequests() {
     if (!window.firebaseDb || !window.currentUser) return;
     
     const currentUserId = window.currentUser.uid;
@@ -2639,59 +2769,81 @@ async function loadTrackerJoinRequests() {
     
     if (!requestsSection || !requestsList) return;
     
+    // Clean up existing listener if any
+    if (window.trackerJoinRequestsListener) {
+        window.trackerJoinRequestsListener();
+        window.trackerJoinRequestsListener = null;
+    }
+    
     try {
-        // Get requests where current user is the tracker owner
+        // Set up real-time listener for requests where current user is the tracker owner
         const requestsRef = window.firebaseDb.collection('trackerJoinRequests');
-        const snapshot = await requestsRef
+        window.trackerJoinRequestsListener = requestsRef
             .where('trackerOwnerId', '==', currentUserId)
             .where('status', '==', 'pending')
-            .get();
-        
-        if (snapshot.empty) {
-            requestsSection.classList.add('hidden');
-            return;
-        }
-        
-        requestsSection.classList.remove('hidden');
-        
-        const requests = [];
-        for (const doc of snapshot.docs) {
-            const requestData = doc.data();
-            const requesterId = requestData.requesterId;
-            
-            // Get requester info
-            const userDoc = await window.firebaseDb.collection('users').doc(requesterId).get();
-            if (userDoc.exists) {
-                const userData = userDoc.data();
-                requests.push({
-                    id: doc.id,
-                    requesterId: requesterId,
-                    name: userData.displayName || userData.name || userData.email || 'Unknown',
-                    email: userData.email || '',
-                    moneyAmount: requestData.moneyAmount || 0
-                });
-            }
-        }
-        
-        if (requests.length === 0) {
-            requestsSection.classList.add('hidden');
-            return;
-        }
-        
-        requestsList.innerHTML = requests.map(request => `
-            <div class="friend-request-item">
-                <div class="friend-search-result-info">
-                    <div class="friend-search-result-name">${request.name}</div>
-                    <div style="font-size: 0.85em; color: #666;">wants to join your tracker with $${request.moneyAmount.toFixed(2)}</div>
-                </div>
-                <div class="friend-request-actions">
-                    <button class="btn-accept" onclick="approveJoinRequest('${request.id}', '${request.requesterId}', ${request.moneyAmount}, '${request.name.replace(/'/g, "\\'")}')">Approve</button>
-                    <button class="btn-decline" onclick="declineJoinRequest('${request.id}')">Decline</button>
-                </div>
-            </div>
-        `).join('');
+            .onSnapshot(async (snapshot) => {
+                if (snapshot.empty) {
+                    requestsSection.classList.add('hidden');
+                    requestsList.innerHTML = '';
+                    return;
+                }
+                
+                requestsSection.classList.remove('hidden');
+                
+                const requests = [];
+                for (const doc of snapshot.docs) {
+                    const requestData = doc.data();
+                    const requesterId = requestData.requesterId;
+                    
+                    // Get requester info
+                    try {
+                        const userDoc = await window.firebaseDb.collection('users').doc(requesterId).get();
+                        if (userDoc.exists) {
+                            const userData = userDoc.data();
+                            requests.push({
+                                id: doc.id,
+                                requesterId: requesterId,
+                                name: userData.displayName || userData.name || userData.email || 'Unknown',
+                                email: userData.email || '',
+                                moneyAmount: requestData.moneyAmount || 0
+                            });
+                        }
+                    } catch (userError) {
+                        console.error('Error fetching user data for requester:', requesterId, userError);
+                        // Still add request with limited info
+                        requests.push({
+                            id: doc.id,
+                            requesterId: requesterId,
+                            name: 'Unknown User',
+                            email: '',
+                            moneyAmount: requestData.moneyAmount || 0
+                        });
+                    }
+                }
+                
+                if (requests.length === 0) {
+                    requestsSection.classList.add('hidden');
+                    requestsList.innerHTML = '';
+                    return;
+                }
+                
+                requestsList.innerHTML = requests.map(request => `
+                    <div class="friend-request-item">
+                        <div class="friend-search-result-info">
+                            <div class="friend-search-result-name">${request.name}</div>
+                            <div style="font-size: 0.85em; color: #666;">wants to join your tracker with $${request.moneyAmount.toFixed(2)}</div>
+                        </div>
+                        <div class="friend-request-actions">
+                            <button class="btn-accept" onclick="approveJoinRequest('${request.id}', '${request.requesterId}', ${request.moneyAmount}, '${request.name.replace(/'/g, "\\'")}')">Approve</button>
+                            <button class="btn-decline" onclick="declineJoinRequest('${request.id}')">Decline</button>
+                        </div>
+                    </div>
+                `).join('');
+            }, (error) => {
+                console.error('Error in tracker join requests listener:', error);
+            });
     } catch (error) {
-        console.error('Error loading tracker join requests:', error);
+        console.error('Error setting up tracker join requests listener:', error);
     }
 }
 
@@ -2767,8 +2919,7 @@ async function approveJoinRequest(requestId, requesterId, moneyAmount, requester
             await loadUserData(currentUserId);
         }
         
-        // Reload requests
-        loadTrackerJoinRequests();
+        // Requests will automatically update via the real-time listener
         
         alert(requesterName + ' has been added to your tracker with $' + moneyAmount.toFixed(2) + '!');
     } catch (error) {
@@ -2785,7 +2936,7 @@ async function declineJoinRequest(requestId) {
         const requestRef = window.firebaseDb.collection('trackerJoinRequests').doc(requestId);
         await requestRef.update({ status: 'declined' });
         
-        loadTrackerJoinRequests();
+        // Requests will automatically update via the real-time listener
     } catch (error) {
         console.error('Error declining join request:', error);
         alert('Error declining request. Please try again.');

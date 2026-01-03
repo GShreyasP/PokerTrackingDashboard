@@ -123,17 +123,17 @@
             
             <div class="form-group">
                 <label for="num-people">Number of People:</label>
-                <input type="number" id="num-people" min="1" placeholder="4">
+                <input type="number" id="num-people" min="1" placeholder="0">
             </div>
             
             <div class="form-group">
                 <label for="stack-value">How much is 1 stack worth? ($):</label>
-                <input type="number" id="stack-value" min="0" step="0.01" placeholder="$10">
+                <input type="number" id="stack-value" min="0" step="0.01" placeholder="0">
             </div>
             
             <div class="form-group">
                 <label for="chips-per-stack">Chips per Stack:</label>
-                <input type="number" id="chips-per-stack" min="1" step="1" placeholder="20">
+                <input type="number" id="chips-per-stack" min="1" step="1" placeholder="0">
             </div>
             
             <div class="form-group">
@@ -143,36 +143,63 @@
                 </label>
             </div>
             
-            <div id="different-chips-section" class="hidden">
+            <div id="different-chips-section">
                 <h3>Chip Values</h3>
                 <div class="chip-inputs">
                     <div class="form-group">
                         <label for="black-value">Black Chip Value ($):</label>
-                        <input type="number" id="black-value" min="0" step="0.01" value="0">
+                        <input type="number" id="black-value" min="0" step="0.01" placeholder="0">
                     </div>
                     <div class="form-group">
                         <label for="white-value">White Chip Value ($):</label>
-                        <input type="number" id="white-value" min="0" step="0.01" value="0">
+                        <input type="number" id="white-value" min="0" step="0.01" placeholder="0">
                     </div>
                     <div class="form-group">
                         <label for="green-value">Green Chip Value ($):</label>
-                        <input type="number" id="green-value" min="0" step="0.01" value="0">
+                        <input type="number" id="green-value" min="0" step="0.01" placeholder="0">
                     </div>
                     <div class="form-group">
                         <label for="red-value">Red Chip Value ($):</label>
-                        <input type="number" id="red-value" min="0" step="0.01" value="0">
+                        <input type="number" id="red-value" min="0" step="0.01" placeholder="0">
                     </div>
                     <div class="form-group">
                         <label for="blue-value">Blue Chip Value ($):</label>
-                        <input type="number" id="blue-value" min="0" step="0.01" value="0">
+                        <input type="number" id="blue-value" min="0" step="0.01" placeholder="0">
+                    </div>
+                </div>
+                
+                <h3 style="margin-top: 20px;">Number of Chips per Stack</h3>
+                <div class="chip-inputs">
+                    <div class="form-group">
+                        <label for="black-count">Number of Black Chips:</label>
+                        <input type="number" id="black-count" min="0" step="1" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="white-count">Number of White Chips:</label>
+                        <input type="number" id="white-count" min="0" step="1" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="green-count">Number of Green Chips:</label>
+                        <input type="number" id="green-count" min="0" step="1" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="red-count">Number of Red Chips:</label>
+                        <input type="number" id="red-count" min="0" step="1" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="blue-count">Number of Blue Chips:</label>
+                        <input type="number" id="blue-count" min="0" step="1" placeholder="0">
                     </div>
                 </div>
             </div>
 
             <div class="setup-actions">
-                <button id="back-to-main-btn" class="btn btn-secondary" onclick="showMainScreen()" style="margin-right: 10px;">Back to Home</button>
                 <button id="setup-btn" class="btn btn-primary">Start Tracking</button>
             </div>
+        </div>
+        
+        <div class="setup-actions" style="margin-top: 20px;">
+            <button id="back-to-main-btn" class="btn btn-secondary" onclick="showMainScreen()">Back to Home</button>
         </div>
         
         <!-- Main Tracking Section -->
