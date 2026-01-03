@@ -2356,33 +2356,114 @@ function updateFriendsNotificationBadge(count) {
     }
 }
 
-// Check for friend request notifications
+// Check for all notifications (friend requests, join requests, edit requests)
 async function checkFriendRequestNotifications() {
     if (!window.firebaseDb || !window.currentUser) return;
     
     try {
         const currentUserId = window.currentUser.uid;
+        let totalCount = 0;
+        
+        // Count friend requests
         const friendRequestsRef = window.firebaseDb.collection('friendRequests');
-        const snapshot = await friendRequestsRef
+        const friendRequestsSnapshot = await friendRequestsRef
             .where('to', '==', currentUserId)
             .where('status', '==', 'pending')
             .get();
+        totalCount += friendRequestsSnapshot.size;
         
-        updateFriendsNotificationBadge(snapshot.size);
+        // Count tracker join requests
+        const joinRequestsRef = window.firebaseDb.collection('trackerJoinRequests');
+        const joinRequestsSnapshot = await joinRequestsRef
+            .where('trackerOwnerId', '==', currentUserId)
+            .where('status', '==', 'pending')
+            .get();
+        totalCount += joinRequestsSnapshot.size;
         
-        // Set up real-time listener for notifications
+        // Count edit access requests
+        const editRequestsRef = window.firebaseDb.collection('trackerEditRequests');
+        const editRequestsSnapshot = await editRequestsRef
+            .where('trackerOwnerId', '==', currentUserId)
+            .where('status', '==', 'pending')
+            .get();
+        totalCount += editRequestsSnapshot.size;
+        
+        updateFriendsNotificationBadge(totalCount);
+        
+        // Set up real-time listener for all notification types
         if (window.friendRequestListener) {
             window.friendRequestListener(); // Unsubscribe old listener
         }
+        if (window.joinRequestListener) {
+            window.joinRequestListener();
+        }
+        if (window.editRequestListener) {
+            window.editRequestListener();
+        }
         
+        // Friend requests listener
         window.friendRequestListener = friendRequestsRef
             .where('to', '==', currentUserId)
             .where('status', '==', 'pending')
-            .onSnapshot((snapshot) => {
-                updateFriendsNotificationBadge(snapshot.size);
+            .onSnapshot(async () => {
+                await updateAllNotifications();
+            });
+        
+        // Join requests listener
+        window.joinRequestListener = joinRequestsRef
+            .where('trackerOwnerId', '==', currentUserId)
+            .where('status', '==', 'pending')
+            .onSnapshot(async () => {
+                await updateAllNotifications();
+            });
+        
+        // Edit requests listener
+        window.editRequestListener = editRequestsRef
+            .where('trackerOwnerId', '==', currentUserId)
+            .where('status', '==', 'pending')
+            .onSnapshot(async () => {
+                await updateAllNotifications();
             });
     } catch (error) {
-        console.error('Error checking friend request notifications:', error);
+        console.error('Error checking notifications:', error);
+    }
+}
+
+// Update all notification counts
+async function updateAllNotifications() {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    try {
+        const currentUserId = window.currentUser.uid;
+        let totalCount = 0;
+        
+        // Count friend requests
+        const friendRequestsRef = window.firebaseDb.collection('friendRequests');
+        const friendRequestsSnapshot = await friendRequestsRef
+            .where('to', '==', currentUserId)
+            .where('status', '==', 'pending')
+            .get();
+        totalCount += friendRequestsSnapshot.size;
+        
+        // Count tracker join requests
+        const joinRequestsRef = window.firebaseDb.collection('trackerJoinRequests');
+        const joinRequestsSnapshot = await joinRequestsRef
+            .where('trackerOwnerId', '==', currentUserId)
+            .where('status', '==', 'pending')
+            .get();
+        totalCount += joinRequestsSnapshot.size;
+        
+        // Count edit access requests
+        const editRequestsRef = window.firebaseDb.collection('trackerEditRequests');
+        const editRequestsSnapshot = await editRequestsRef
+            .where('trackerOwnerId', '==', currentUserId)
+            .where('status', '==', 'pending')
+            .get();
+        totalCount += editRequestsSnapshot.size;
+        
+        updateFriendsNotificationBadge(totalCount);
+    } catch (error) {
+        console.error('Error updating notifications:', error);
     }
 }
 
@@ -3183,6 +3264,11 @@ async function loadTrackerAccessRequests() {
                 </div>
             </div>
         `).join('');
+        
+        // Update notifications
+        if (window.updateAllNotifications) {
+            updateAllNotifications();
+        }
     } catch (error) {
         console.error('Error loading tracker access requests:', error);
     }
@@ -3227,6 +3313,11 @@ async function grantEditingAccess(requestId, requesterId) {
         // Reload requests
         loadTrackerAccessRequests();
         
+        // Update notifications
+        if (window.updateAllNotifications) {
+            await window.updateAllNotifications();
+        }
+        
         alert('Edit access granted!');
     } catch (error) {
         console.error('Error granting editing access:', error);
@@ -3243,6 +3334,11 @@ async function declineEditingAccess(requestId) {
         await requestRef.update({ status: 'declined' });
         
         loadTrackerAccessRequests();
+        
+        // Update notifications
+        if (window.updateAllNotifications) {
+            await window.updateAllNotifications();
+        }
     } catch (error) {
         console.error('Error declining editing access request:', error);
         alert('Error declining request. Please try again.');
@@ -3329,6 +3425,11 @@ function loadTrackerJoinRequests() {
                         </div>
                     </div>
                 `).join('');
+                
+                // Update notifications when requests change
+                if (window.updateAllNotifications) {
+                    updateAllNotifications();
+                }
             }, (error) => {
                 console.error('Error in tracker join requests listener:', error);
             });
@@ -3344,17 +3445,46 @@ async function approveJoinRequest(requestId, requesterId, moneyAmount, requester
     const currentUserId = window.currentUser.uid;
     
     try {
-        // Load current tracker state
+        // Load user document
         const userDoc = await window.firebaseDb.collection('users').doc(currentUserId).get();
-        if (!userDoc.exists || !userDoc.data().state) {
-            alert('Tracker not found.');
+        if (!userDoc.exists) {
+            showAlertModal('Tracker not found.');
             return;
         }
         
-        const trackerState = userDoc.data().state;
+        const userData = userDoc.data();
+        let trackers = userData.trackers || [];
+        
+        // Determine which tracker to update
+        // If we have a current tracker ID, use that; otherwise use the most recent tracker
+        let targetTrackerId = state.trackerId;
+        if (!targetTrackerId && trackers.length > 0) {
+            // Sort by updatedAt and get the most recent
+            const sortedTrackers = [...trackers].sort((a, b) => {
+                const aTime = new Date(a.updatedAt || 0).getTime();
+                const bTime = new Date(b.updatedAt || 0).getTime();
+                return bTime - aTime;
+            });
+            targetTrackerId = sortedTrackers[0].id;
+        }
+        
+        if (!targetTrackerId) {
+            showAlertModal('No active tracker found. Please create or open a tracker first.');
+            return;
+        }
+        
+        // Find the tracker to update
+        const trackerIndex = trackers.findIndex(t => t.id === targetTrackerId);
+        if (trackerIndex === -1) {
+            showAlertModal('Tracker not found.');
+            return;
+        }
+        
+        const tracker = trackers[trackerIndex];
+        const trackerState = tracker.state;
         
         // Find the next available person ID
-        const maxId = trackerState.people.length > 0 
+        const maxId = trackerState.people && trackerState.people.length > 0
             ? Math.max(...trackerState.people.map(p => p.id))
             : -1;
         const newPersonId = maxId + 1;
@@ -3365,6 +3495,32 @@ async function approveJoinRequest(requestId, requesterId, moneyAmount, requester
             chips = Math.round(moneyAmount / trackerState.chipValue);
         } else if (trackerState.sameValue && trackerState.chipsPerStack > 0 && trackerState.stackValue > 0) {
             chips = Math.round((moneyAmount / trackerState.stackValue) * trackerState.chipsPerStack);
+        } else if (!trackerState.sameValue) {
+            // Calculate chips for different chip values
+            const chipValues = trackerState.chipValues || {};
+            const chipCounts = trackerState.chipCounts || {};
+            let totalChips = 0;
+            let stackValue = 0;
+            
+            // Calculate stack value
+            Object.keys(chipValues).forEach(color => {
+                const value = chipValues[color] || 0;
+                const count = chipCounts[color] || 0;
+                stackValue += value * count;
+            });
+            
+            if (stackValue > 0) {
+                totalChips = Math.round((moneyAmount / stackValue) * Object.values(chipCounts).reduce((sum, count) => sum + (count || 0), 0));
+            }
+            chips = totalChips;
+        }
+        
+        // Initialize arrays if they don't exist
+        if (!trackerState.people) {
+            trackerState.people = [];
+        }
+        if (!trackerState.transactions) {
+            trackerState.transactions = [];
         }
         
         // Add new person to tracker
@@ -3380,10 +3536,6 @@ async function approveJoinRequest(requestId, requesterId, moneyAmount, requester
         trackerState.people.push(newPerson);
         
         // Add transaction for the new person
-        if (trackerState.transactions === undefined) {
-            trackerState.transactions = [];
-        }
-        
         trackerState.transactions.push({
             id: Date.now(),
             personId: newPersonId,
@@ -3393,28 +3545,42 @@ async function approveJoinRequest(requestId, requesterId, moneyAmount, requester
             timestamp: new Date().toISOString()
         });
         
-        // Save updated state
+        // Update the tracker in the array
         const stateToSave = prepareStateForFirestore(trackerState);
-        await window.firebaseDb.collection('users').doc(currentUserId).set({
+        trackers[trackerIndex] = {
+            ...tracker,
             state: stateToSave,
+            updatedAt: new Date().toISOString()
+        };
+        
+        // Save updated trackers array
+        await window.firebaseDb.collection('users').doc(currentUserId).set({
+            trackers: trackers,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
+        
+        // Also update state if this is the current tracker
+        if (state.trackerId === targetTrackerId) {
+            restoreState(trackerState);
+            renderPeopleWidgets();
+            updateTotalPot();
+            updateTotalChips();
+            renderLog();
+        }
         
         // Update request status
         const requestRef = window.firebaseDb.collection('trackerJoinRequests').doc(requestId);
         await requestRef.update({ status: 'approved' });
         
-        // Reload current state if viewing own tracker
-        if (!trackerViewState.isViewingFriendTracker) {
-            await loadUserData(currentUserId);
+        // Update notifications
+        if (window.updateAllNotifications) {
+            await window.updateAllNotifications();
         }
         
-        // Requests will automatically update via the real-time listener
-        
-        alert(requesterName + ' has been added to your tracker with $' + moneyAmount.toFixed(2) + '!');
+        showAlertModal(requesterName + ' has been added to your tracker with $' + moneyAmount.toFixed(2) + '!');
     } catch (error) {
         console.error('Error approving join request:', error);
-        alert('Error approving join request. Please try again.');
+        showAlertModal('Error approving join request. Please try again.');
     }
 }
 
@@ -3425,6 +3591,11 @@ async function declineJoinRequest(requestId) {
     try {
         const requestRef = window.firebaseDb.collection('trackerJoinRequests').doc(requestId);
         await requestRef.update({ status: 'declined' });
+        
+        // Update notifications
+        if (window.updateAllNotifications) {
+            await window.updateAllNotifications();
+        }
         
         // Requests will automatically update via the real-time listener
     } catch (error) {
@@ -4035,6 +4206,7 @@ window.updateOnlineStatus = updateOnlineStatus;
 window.showFriendsButton = showFriendsButton;
 window.hideFriendsButton = hideFriendsButton;
 window.checkFriendRequestNotifications = checkFriendRequestNotifications;
+window.updateAllNotifications = updateAllNotifications;
 window.loadState = loadState; // Make available for firebase-init.js
 window.joinFriendTracker = joinFriendTracker;
 window.getOrCreateUniqueId = getOrCreateUniqueId; // Make available for firebase-init.js
