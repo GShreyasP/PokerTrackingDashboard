@@ -3006,15 +3006,14 @@ async function loadLiveTables() {
 
 // Show join tracker modal (request to join)
 function showJoinTrackerModal(friendId, friendName) {
-    const amount = prompt(`Enter the amount of money you want to put in ${friendName}'s tracker:`);
-    if (amount !== null && amount !== '') {
-        const moneyAmount = parseFloat(amount);
-        if (isNaN(moneyAmount) || moneyAmount <= 0) {
-            alert('Please enter a valid amount greater than 0.');
-            return;
-        }
-        requestJoinTracker(friendId, friendName, moneyAmount);
-    }
+    showAmountInputModal(
+        `Enter the amount of money you want to put in ${friendName}'s tracker:`,
+        (amount) => {
+            requestJoinTracker(friendId, friendName, amount);
+        },
+        friendId,
+        friendName
+    );
 }
 
 // Request to join a friend's tracker (adds user as a person to the tracker)
@@ -3033,7 +3032,7 @@ async function requestJoinTracker(friendId, friendName, moneyAmount) {
             .get();
         
         if (!existingRequest.empty) {
-            alert('You have already sent a join request to this tracker.');
+            showAlertModal('You have already sent a join request to this tracker.');
             return;
         }
         
@@ -3046,7 +3045,7 @@ async function requestJoinTracker(friendId, friendName, moneyAmount) {
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        alert('Join request sent to ' + friendName + '! They will need to approve it to add you to their tracker.');
+        showAlertModal('Join request sent to ' + friendName + '! They will need to approve it to add you to their tracker.');
         
         // Also create read-only access so they can view
         const accessRef = window.firebaseDb.collection('trackerAccess');
@@ -3070,7 +3069,108 @@ async function requestJoinTracker(friendId, friendName, moneyAmount) {
         loadLiveTables();
     } catch (error) {
         console.error('Error requesting to join tracker:', error);
-        alert('Error sending join request. Please try again.');
+        showAlertModal('Error sending join request. Please try again.');
+    }
+}
+
+// Custom Modal Functions (replacing browser alert/prompt)
+let amountInputCallback = null;
+let currentFriendId = null;
+let currentFriendName = null;
+let amountInputKeyHandler = null;
+let alertKeyHandler = null;
+
+// Show custom amount input modal
+function showAmountInputModal(message, callback, friendId, friendName) {
+    currentFriendId = friendId;
+    currentFriendName = friendName;
+    amountInputCallback = callback;
+    
+    const modal = document.getElementById('amount-input-modal');
+    const messageEl = document.getElementById('amount-input-message');
+    const inputEl = document.getElementById('amount-input-field');
+    
+    messageEl.textContent = message || 'Enter the amount of money you want to put in the tracker:';
+    inputEl.value = '';
+    modal.classList.remove('hidden');
+    
+    // Focus input and select all text
+    setTimeout(() => {
+        inputEl.focus();
+        inputEl.select();
+    }, 100);
+    
+    // Handle Enter and Escape keys
+    amountInputKeyHandler = function(e) {
+        if (e.key === 'Enter') {
+            confirmAmountInput();
+        } else if (e.key === 'Escape') {
+            closeAmountInputModal();
+        }
+    };
+    document.addEventListener('keydown', amountInputKeyHandler);
+}
+
+// Close amount input modal
+function closeAmountInputModal() {
+    const modal = document.getElementById('amount-input-modal');
+    modal.classList.add('hidden');
+    amountInputCallback = null;
+    currentFriendId = null;
+    currentFriendName = null;
+    if (amountInputKeyHandler) {
+        document.removeEventListener('keydown', amountInputKeyHandler);
+        amountInputKeyHandler = null;
+    }
+}
+
+// Confirm amount input
+function confirmAmountInput() {
+    const inputEl = document.getElementById('amount-input-field');
+    const amount = inputEl.value.trim();
+    
+    if (amount === '') {
+        showAlertModal('Please enter a valid amount greater than 0.');
+        return;
+    }
+    
+    const moneyAmount = parseFloat(amount);
+    if (isNaN(moneyAmount) || moneyAmount <= 0) {
+        showAlertModal('Please enter a valid amount greater than 0.');
+        return;
+    }
+    
+    closeAmountInputModal();
+    
+    if (amountInputCallback) {
+        amountInputCallback(moneyAmount);
+    }
+}
+
+// Show custom alert modal
+function showAlertModal(message) {
+    const modal = document.getElementById('alert-modal');
+    const messageEl = document.getElementById('alert-message');
+    
+    messageEl.textContent = message;
+    modal.classList.remove('hidden');
+    
+    // Handle Escape and Enter keys
+    alertKeyHandler = function(e) {
+        if (e.key === 'Escape' || e.key === 'Enter') {
+            closeAlertModal();
+        }
+    };
+    document.addEventListener('keydown', alertKeyHandler);
+}
+
+// Close alert modal
+function closeAlertModal() {
+    const modal = document.getElementById('alert-modal');
+    modal.classList.add('hidden');
+    if (alertKeyHandler) {
+        document.removeEventListener('keydown', alertKeyHandler);
+        alertKeyHandler = null;
     }
 }
 
@@ -3121,6 +3221,9 @@ window.returnToOwnTracker = returnToOwnTracker;
 window.showFriendTrackerOptions = showFriendTrackerOptions;
 window.grantFriendEditAccess = grantFriendEditAccess;
 window.showJoinTrackerModal = showJoinTrackerModal;
+window.closeAmountInputModal = closeAmountInputModal;
+window.confirmAmountInput = confirmAmountInput;
+window.closeAlertModal = closeAlertModal;
 window.requestJoinTracker = requestJoinTracker;
 window.loadLiveTables = loadLiveTables;
 window.approveJoinRequest = approveJoinRequest;

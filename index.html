@@ -297,6 +297,38 @@
         
         <!-- Overlay for sidebar -->
         <div id="sidebar-overlay" class="sidebar-overlay hidden" onclick="toggleFriendsSidebar()"></div>
+        
+        <!-- Custom Modal for Amount Input -->
+        <div id="amount-input-modal" class="custom-modal hidden" onclick="if(event.target === this) closeAmountInputModal()">
+            <div class="custom-modal-content" onclick="event.stopPropagation()">
+                <div class="custom-modal-header">
+                    <h3 id="amount-input-title">Enter Amount</h3>
+                </div>
+                <div class="custom-modal-body">
+                    <p id="amount-input-message">Enter the amount of money you want to put in the tracker:</p>
+                    <input type="number" id="amount-input-field" class="custom-modal-input" placeholder="0.00" step="0.01" min="0.01">
+                </div>
+                <div class="custom-modal-footer">
+                    <button class="btn btn-secondary" onclick="closeAmountInputModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="confirmAmountInput()">OK</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Custom Modal for Alert/Confirmation -->
+        <div id="alert-modal" class="custom-modal hidden" onclick="if(event.target === this) closeAlertModal()">
+            <div class="custom-modal-content" onclick="event.stopPropagation()">
+                <div class="custom-modal-header">
+                    <h3>Notification</h3>
+                </div>
+                <div class="custom-modal-body">
+                    <p id="alert-message"></p>
+                </div>
+                <div class="custom-modal-footer">
+                    <button class="btn btn-primary" onclick="closeAlertModal()">OK</button>
+                </div>
+            </div>
+        </div>
     </div>
     
     <script src="/script.js"></script>
