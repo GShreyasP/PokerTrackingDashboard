@@ -266,6 +266,14 @@ async function showSetupSection() {
         errorDiv.classList.add('hidden');
     }
     
+    // Clear tracker ID and name to ensure a new tracker is created
+    state.trackerId = null;
+    state.trackerName = null;
+    
+    // Clear people array to start fresh
+    state.people = [];
+    state.transactions = [];
+    
     const mainScreen = document.getElementById('main-screen');
     const setupSection = document.getElementById('setup-section');
     const trackingSection = document.getElementById('tracking-section');
@@ -823,10 +831,15 @@ async function startTracking() {
         }
     }
     
-    // Generate tracker ID and name if this is a new tracker
+    // Always generate a new tracker ID and name when creating from setup
+    // (trackerId should be null when coming from setup section)
     if (!state.trackerId) {
-        state.trackerId = Date.now().toString(); // Simple ID generation
+        // Generate unique ID using timestamp + random number to avoid collisions
+        state.trackerId = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
         state.trackerName = `Table ${new Date().toLocaleDateString()}`;
+        console.log('Creating new tracker with ID:', state.trackerId);
+    } else {
+        console.log('Updating existing tracker with ID:', state.trackerId);
     }
     
     // Save this tracker to user's trackers array
