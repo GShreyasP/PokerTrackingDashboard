@@ -16,7 +16,10 @@
         <div class="page-header">
             <h1>Poker Money Tracker</h1>
             <div class="header-actions-right">
-                <button id="friends-btn" class="btn btn-friends hidden" onclick="toggleFriendsSidebar()">Friends</button>
+                <button id="friends-btn" class="btn btn-friends hidden" onclick="toggleFriendsSidebar()">
+                    Friends
+                    <span id="friends-notification-badge" class="notification-badge hidden">0</span>
+                </button>
                 <div id="header-user-info" class="header-user-info hidden">
                     <span id="header-user-name"></span>
                     <button id="header-sign-out-btn" class="btn btn-sign-out" onclick="signOut()">Sign Out</button>

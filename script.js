@@ -1380,10 +1380,13 @@ function hideFriendsButton() {
 
 // Search for friend by email or name
 async function searchFriend() {
-    if (!window.firebaseDb || !window.currentUser) return;
+    if (!window.firebaseDb || !window.currentUser) {
+        alert('Please sign in to search for friends');
+        return;
+    }
     
     const searchInput = document.getElementById('friend-search-input');
-    const searchTerm = searchInput.value.trim().toLowerCase();
+    const searchTerm = searchInput.value.trim();
     const resultsDiv = document.getElementById('friend-search-results');
     
     if (!searchTerm) {
@@ -1391,10 +1394,29 @@ async function searchFriend() {
         return;
     }
     
+    // Show loading state
+    resultsDiv.innerHTML = '<p style="text-align: center; color: #666; padding: 10px;">Searching...</p>';
+    resultsDiv.classList.remove('hidden');
+    
     try {
-        // Search users collection by email or displayName
+        const searchTermLower = searchTerm.toLowerCase();
         const usersRef = window.firebaseDb.collection('users');
-        const snapshot = await usersRef.get();
+        
+        // Try to get user by exact email match first (more efficient)
+        let snapshot;
+        if (searchTerm.includes('@')) {
+            // If it looks like an email, try to find exact match
+            try {
+                // Note: Firestore doesn't support case-insensitive queries
+                // We'll need to get all and filter, or store lowercase emails
+                snapshot = await usersRef.get();
+            } catch (err) {
+                console.error('Error querying users:', err);
+                throw err;
+            }
+        } else {
+            snapshot = await usersRef.get();
+        }
         
         const results = [];
         snapshot.forEach(doc => {
@@ -1405,20 +1427,21 @@ async function searchFriend() {
             if (userId === window.currentUser.uid) return;
             
             const email = (userData.email || '').toLowerCase();
-            const name = (userData.displayName || '').toLowerCase();
+            const name = (userData.displayName || userData.name || '').toLowerCase();
             
-            if (email.includes(searchTerm) || name.includes(searchTerm)) {
+            // Match if email or name contains search term
+            if (email.includes(searchTermLower) || name.includes(searchTermLower)) {
                 results.push({
                     id: userId,
                     email: userData.email || '',
-                    name: userData.displayName || userData.email || 'Unknown',
+                    name: userData.displayName || userData.name || userData.email || 'Unknown',
                     ...userData
                 });
             }
         });
         
         if (results.length === 0) {
-            resultsDiv.innerHTML = '<p style="text-align: center; color: #666; padding: 10px;">No users found</p>';
+            resultsDiv.innerHTML = '<p style="text-align: center; color: #666; padding: 10px;">No users found matching "' + searchTerm + '"</p>';
             resultsDiv.classList.remove('hidden');
             return;
         }
@@ -1430,19 +1453,20 @@ async function searchFriend() {
                     <div class="friend-search-result-name">${user.name}</div>
                     <div class="friend-search-result-email">${user.email}</div>
                 </div>
-                <button class="btn btn-primary btn-sm" onclick="sendFriendRequest('${user.id}')">Add Friend</button>
+                <button class="btn btn-primary btn-sm" onclick="sendFriendRequest('${user.id}', '${user.name.replace(/'/g, "\\'")}')">Add Friend</button>
             </div>
         `).join('');
         
         resultsDiv.classList.remove('hidden');
     } catch (error) {
         console.error('Error searching for friend:', error);
-        alert('Error searching for users. Please try again.');
+        resultsDiv.innerHTML = '<p style="text-align: center; color: #dc3545; padding: 10px;">Error searching for users. Please check your connection and try again.</p>';
+        resultsDiv.classList.remove('hidden');
     }
 }
 
 // Send friend request
-async function sendFriendRequest(friendId) {
+async function sendFriendRequest(friendId, friendName) {
     if (!window.firebaseDb || !window.currentUser) return;
     
     const currentUserId = window.currentUser.uid;
@@ -1457,7 +1481,7 @@ async function sendFriendRequest(friendId) {
             .get();
         
         if (!existingRequest.empty) {
-            alert('Friend request already sent');
+            alert('Friend request already sent to ' + (friendName || 'this user'));
             return;
         }
         
@@ -1485,7 +1509,7 @@ async function sendFriendRequest(friendId) {
             .get();
         
         if (!friendCheck1.empty || !friendCheck2.empty) {
-            alert('You are already friends with this user');
+            alert('You are already friends with ' + (friendName || 'this user'));
             return;
         }
         
@@ -1497,7 +1521,10 @@ async function sendFriendRequest(friendId) {
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        alert('Friend request sent!');
+        // Update notification count for the recipient
+        updateFriendRequestNotification(friendId);
+        
+        alert('Friend request sent to ' + (friendName || 'user') + '!');
         document.getElementById('friend-search-input').value = '';
         document.getElementById('friend-search-results').classList.add('hidden');
     } catch (error) {
@@ -1546,10 +1573,16 @@ async function loadFriendRequests() {
             }
         }
         
+        // Update notification badge
+        updateFriendsNotificationBadge(requests.length);
+        
         if (requests.length === 0) {
             requestsSection.classList.add('hidden');
+            updateFriendsNotificationBadge(0);
             return;
         }
+        
+        requestsSection.classList.remove('hidden');
         
         requestsList.innerHTML = requests.map(request => `
             <div class="friend-request-item">
@@ -1566,6 +1599,55 @@ async function loadFriendRequests() {
     } catch (error) {
         console.error('Error loading friend requests:', error);
     }
+}
+
+// Update friends notification badge
+function updateFriendsNotificationBadge(count) {
+    const badge = document.getElementById('friends-notification-badge');
+    if (!badge) return;
+    
+    if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+// Check for friend request notifications
+async function checkFriendRequestNotifications() {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    try {
+        const currentUserId = window.currentUser.uid;
+        const friendRequestsRef = window.firebaseDb.collection('friendRequests');
+        const snapshot = await friendRequestsRef
+            .where('to', '==', currentUserId)
+            .where('status', '==', 'pending')
+            .get();
+        
+        updateFriendsNotificationBadge(snapshot.size);
+        
+        // Set up real-time listener for notifications
+        if (window.friendRequestListener) {
+            window.friendRequestListener(); // Unsubscribe old listener
+        }
+        
+        window.friendRequestListener = friendRequestsRef
+            .where('to', '==', currentUserId)
+            .where('status', '==', 'pending')
+            .onSnapshot((snapshot) => {
+                updateFriendsNotificationBadge(snapshot.size);
+            });
+    } catch (error) {
+        console.error('Error checking friend request notifications:', error);
+    }
+}
+
+// Update notification for recipient when friend request is sent
+async function updateFriendRequestNotification(recipientId) {
+    // The recipient's listener will automatically update when the request is created
+    // This function is here for future use if needed
 }
 
 // Accept friend request
@@ -1587,9 +1669,10 @@ async function acceptFriendRequest(requestId, fromUserId) {
         const requestRef = window.firebaseDb.collection('friendRequests').doc(requestId);
         await requestRef.update({ status: 'accepted' });
         
-        // Reload friends list
+        // Reload friends list and update notifications
         loadFriendsList();
         loadFriendRequests();
+        checkFriendRequestNotifications();
     } catch (error) {
         console.error('Error accepting friend request:', error);
         alert('Error accepting friend request. Please try again.');
@@ -1605,6 +1688,7 @@ async function declineFriendRequest(requestId) {
         await requestRef.update({ status: 'declined' });
         
         loadFriendRequests();
+        checkFriendRequestNotifications();
     } catch (error) {
         console.error('Error declining friend request:', error);
         alert('Error declining friend request. Please try again.');
@@ -1614,6 +1698,9 @@ async function declineFriendRequest(requestId) {
 // Load friends list
 async function loadFriendsList() {
     if (!window.firebaseDb || !window.currentUser) return;
+    
+    // Also check for notifications
+    checkFriendRequestNotifications();
     
     const currentUserId = window.currentUser.uid;
     const onlineList = document.getElementById('online-friends-list');
@@ -1816,6 +1903,7 @@ window.copyInviteLink = copyInviteLink;
 window.updateOnlineStatus = updateOnlineStatus;
 window.showFriendsButton = showFriendsButton;
 window.hideFriendsButton = hideFriendsButton;
+window.checkFriendRequestNotifications = checkFriendRequestNotifications;
 window.loadState = loadState; // Make available for firebase-init.js
 
 // Initialize on page load

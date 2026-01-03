@@ -1170,11 +1170,38 @@ h3 {
     cursor: pointer;
     border-radius: 6px;
     transition: all 0.3s;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .btn-friends:hover {
     background: rgba(255, 255, 255, 0.3);
     transform: translateY(-2px);
+}
+
+.notification-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #dc3545;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7em;
+    font-weight: 600;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    min-width: 20px;
+    padding: 0 2px;
+}
+
+.notification-badge.hidden {
+    display: none;
 }
 
 /* Friends Sidebar */

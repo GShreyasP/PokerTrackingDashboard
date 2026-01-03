@@ -47,6 +47,13 @@ async function initFirebase() {
                     window.showFriendsButton();
                 }
                 
+                // Check for friend request notifications
+                if (window.checkFriendRequestNotifications) {
+                    setTimeout(() => {
+                        window.checkFriendRequestNotifications();
+                    }, 500);
+                }
+                
                 if (typeof loadUserData === 'function') {
                     loadUserData(user.uid);
                 } else {
