@@ -1579,7 +1579,7 @@ async function loadFriendRequests() {
                 requests.push({
                     id: doc.id,
                     fromUserId: fromUserId,
-                    name: userData.displayName || userData.email || 'Unknown',
+                    name: userData.displayName || userData.name || userData.email || 'Unknown',
                     email: userData.email || ''
                 });
             }
@@ -1759,7 +1759,7 @@ async function loadFriendsList() {
                 
                 friends.push({
                     id: friendId,
-                    name: userData.displayName || userData.email || 'Unknown',
+                    name: userData.displayName || userData.name || userData.email || 'Unknown',
                     email: userData.email || '',
                     isOnline: isOnline
                 });
