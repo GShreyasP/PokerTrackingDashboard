@@ -1536,6 +1536,17 @@ function toggleFriendsSidebar() {
     }
 }
 
+// Close friends sidebar (only closes if open)
+function closeFriendsSidebar() {
+    const sidebar = document.getElementById('friends-sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+
+    if (sidebar && overlay && !sidebar.classList.contains('hidden')) {
+        sidebar.classList.add('hidden');
+        overlay.classList.add('hidden');
+    }
+}
+
 // Show friends button when authenticated
 function showFriendsButton() {
     const friendsBtn = document.getElementById('friends-btn');
@@ -2444,10 +2455,10 @@ async function viewFriendTracker(friendId) {
         
         // Update UI for read-only mode
         updateUIForViewingMode(hasEditAccess);
-        
+
         // Close friends sidebar if open
-        toggleFriendsSidebar();
-        
+        closeFriendsSidebar();
+
         // Show banner indicating viewing mode
         showViewingModeBanner(friendId, hasEditAccess);
     } catch (error) {
