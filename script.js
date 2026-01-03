@@ -1974,7 +1974,7 @@ async function loadFriendsList() {
                             </div>
                         </div>
                         <div class="friend-item-actions" style="display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
-                            ${hasActiveTracker && isOwnTracker ? `
+                            ${hasActiveTracker && isOwnTracker && hasTracker ? `
                                 ${hasEditAccess ? `
                                     <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); revokeFriendEditAccess('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')" style="background: #dc3545; color: white; padding: 5px 10px; font-size: 0.85em;">Remove Edit Access</button>
                                 ` : `
@@ -2018,7 +2018,7 @@ async function loadFriendsList() {
                             </div>
                         </div>
                         <div class="friend-item-actions" style="display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
-                            ${hasActiveTracker && isOwnTracker ? `
+                            ${hasActiveTracker && isOwnTracker && hasTracker ? `
                                 ${hasEditAccess ? `
                                     <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); revokeFriendEditAccess('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')" style="background: #dc3545; color: white; padding: 5px 10px; font-size: 0.85em;">Remove Edit Access</button>
                                 ` : `
