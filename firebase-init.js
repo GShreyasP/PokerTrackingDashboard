@@ -34,7 +34,7 @@ async function initFirebase() {
             if (user) {
                 // User is signed in
                 window.currentUser = user;
-                showAuthenticatedView(user);
+                await showAuthenticatedView(user);
                 
                 // Update online status
                 if (window.updateOnlineStatus) {
