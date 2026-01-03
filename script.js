@@ -2011,8 +2011,10 @@ function showFriendsButton() {
     // Only show friends button if authenticated and not on auth page
     if (friendsBtn && window.currentUser && authPage && authPage.classList.contains('hidden')) {
         friendsBtn.classList.remove('hidden');
+        friendsBtn.style.display = ''; // Remove inline style
     } else if (friendsBtn) {
         friendsBtn.classList.add('hidden');
+        friendsBtn.style.display = 'none'; // Force hide with inline style
     }
 }
 
@@ -2021,6 +2023,7 @@ function hideFriendsButton() {
     const friendsBtn = document.getElementById('friends-btn');
     if (friendsBtn) {
         friendsBtn.classList.add('hidden');
+        friendsBtn.style.display = 'none'; // Force hide with inline style
     }
 }
 

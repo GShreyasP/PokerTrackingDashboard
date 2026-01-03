@@ -26,6 +26,7 @@ async function initFirebase() {
         const friendsBtn = document.getElementById('friends-btn');
         if (friendsBtn) {
             friendsBtn.classList.add('hidden');
+            friendsBtn.style.display = 'none'; // Force hide with inline style
         }
         
         // Listen for auth state changes
@@ -119,7 +120,13 @@ function showAuthPage() {
     if (trackingSection) trackingSection.classList.add('hidden');
     if (mainScreen) mainScreen.classList.add('hidden');
     if (headerUserInfo) headerUserInfo.classList.add('hidden');
-    if (friendsBtn) friendsBtn.classList.add('hidden');
+    
+    // Force hide friends button with both class and inline style
+    if (friendsBtn) {
+        friendsBtn.classList.add('hidden');
+        friendsBtn.style.display = 'none';
+    }
+    
     if (backToHomeBtn) backToHomeBtn.classList.add('hidden');
 }
 
@@ -137,6 +144,7 @@ function showAuthenticatedView(user) {
     // Ensure friends button is hidden until explicitly shown after auth page is hidden
     if (friendsBtn) {
         friendsBtn.classList.add('hidden');
+        friendsBtn.style.display = 'none'; // Force hide with inline style
     }
     
     // Update user info in tracking section (if exists)
@@ -165,21 +173,26 @@ function showAuthenticatedView(user) {
 }
 
 // Ensure Friends button is hidden on initial page load (before Firebase initializes)
-(function() {
+function ensureInitialState() {
     const friendsBtn = document.getElementById('friends-btn');
     if (friendsBtn) {
         friendsBtn.classList.add('hidden');
+        friendsBtn.style.display = 'none'; // Force hide with inline style
     }
     // Also show auth page by default
     const authPage = document.getElementById('auth-page');
     if (authPage) {
         authPage.classList.remove('hidden');
     }
-})();
+}
 
 // Initialize when page loads
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initFirebase);
+    document.addEventListener('DOMContentLoaded', function() {
+        ensureInitialState();
+        initFirebase();
+    });
 } else {
+    ensureInitialState();
     initFirebase();
 }

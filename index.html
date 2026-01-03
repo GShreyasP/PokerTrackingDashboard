@@ -26,6 +26,16 @@
                 </div>
             </div>
         </div>
+        <script>
+            // Immediately hide friends button on page load (runs as soon as button exists in DOM)
+            (function() {
+                const friendsBtn = document.getElementById('friends-btn');
+                if (friendsBtn) {
+                    friendsBtn.classList.add('hidden');
+                    friendsBtn.style.display = 'none';
+                }
+            })();
+        </script>
         
         <!-- Authentication Section (shown first) -->
         <div id="auth-page" class="auth-page">
