@@ -1460,7 +1460,20 @@ async function searchFriend() {
         resultsDiv.classList.remove('hidden');
     } catch (error) {
         console.error('Error searching for friend:', error);
-        resultsDiv.innerHTML = '<p style="text-align: center; color: #dc3545; padding: 10px;">Error searching for users. Please check your connection and try again.</p>';
+        let errorMessage = 'Error searching for users. ';
+        
+        // Check for specific error types
+        if (error.code === 'permission-denied') {
+            errorMessage += 'Permission denied. Please check Firestore security rules allow reading users collection.';
+        } else if (error.code === 'unavailable') {
+            errorMessage += 'Service unavailable. Please check your internet connection.';
+        } else if (error.message) {
+            errorMessage += error.message;
+        } else {
+            errorMessage += 'Please try again.';
+        }
+        
+        resultsDiv.innerHTML = '<p style="text-align: center; color: #dc3545; padding: 10px;">' + errorMessage + '</p>';
         resultsDiv.classList.remove('hidden');
     }
 }
