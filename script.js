@@ -1600,7 +1600,6 @@ async function loadFriendRequests() {
             <div class="friend-request-item">
                 <div class="friend-search-result-info">
                     <div class="friend-search-result-name">${request.name}</div>
-                    <div class="friend-search-result-email">${request.email}</div>
                 </div>
                 <div class="friend-request-actions">
                     <button class="btn-accept" onclick="acceptFriendRequest('${request.id}', '${request.fromUserId}')">Accept</button>
