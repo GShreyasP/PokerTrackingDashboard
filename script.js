@@ -54,6 +54,75 @@ const chipsWarning = document.getElementById('chips-warning');
 const logEntriesDiv = document.getElementById('log-entries');
 const liveTablesContainer = document.getElementById('live-tables-container');
 
+// Generate a short unique ID for users (6 characters: 2 letters + 4 numbers)
+function generateUniqueId() {
+    const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // Exclude I, O to avoid confusion
+    const numbers = '0123456789';
+    
+    let id = '';
+    // First 2 characters: letters
+    for (let i = 0; i < 2; i++) {
+        id += letters.charAt(Math.floor(Math.random() * letters.length));
+    }
+    // Next 4 characters: numbers
+    for (let i = 0; i < 4; i++) {
+        id += numbers.charAt(Math.floor(Math.random() * numbers.length));
+    }
+    
+    return id;
+}
+
+// Get or create unique ID for current user
+async function getOrCreateUniqueId(userId) {
+    if (!window.firebaseDb) return null;
+    
+    try {
+        const userRef = window.firebaseDb.collection('users').doc(userId);
+        const userDoc = await userRef.get();
+        
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            if (userData.uniqueId) {
+                return userData.uniqueId;
+            }
+        }
+        
+        // Generate new unique ID
+        let uniqueId;
+        let attempts = 0;
+        let isUnique = false;
+        
+        // Check for uniqueness (try up to 10 times)
+        while (!isUnique && attempts < 10) {
+            uniqueId = generateUniqueId();
+            const existingUser = await window.firebaseDb.collection('users')
+                .where('uniqueId', '==', uniqueId)
+                .limit(1)
+                .get();
+            
+            if (existingUser.empty) {
+                isUnique = true;
+            } else {
+                attempts++;
+            }
+        }
+        
+        if (!isUnique) {
+            // Fallback: use first 6 characters of userId
+            uniqueId = userId.substring(0, 6).toUpperCase();
+        }
+        
+        // Save unique ID to user document
+        await userRef.set({ uniqueId }, { merge: true });
+        
+        return uniqueId;
+    } catch (error) {
+        console.error('Error getting/creating unique ID:', error);
+        // Fallback: use first 6 characters of userId
+        return userId.substring(0, 6).toUpperCase();
+    }
+}
+
 // Initialize
 sameValueToggle.addEventListener('change', toggleChipValueMode);
 setupBtn.addEventListener('click', startTracking);
@@ -2078,12 +2147,14 @@ async function searchFriend() {
             const email = (userData.email || '').toLowerCase();
             const name = (userData.displayName || userData.name || '').toLowerCase();
             
-            // Match if email or name contains search term
-            if (email.includes(searchTermLower) || name.includes(searchTermLower)) {
+            // Match if email, name, or unique ID contains search term
+            const uniqueId = (userData.uniqueId || '').toLowerCase();
+            if (email.includes(searchTermLower) || name.includes(searchTermLower) || uniqueId.includes(searchTermLower)) {
                 results.push({
                     id: userId,
                     email: userData.email || '',
                     name: userData.displayName || userData.name || userData.email || 'Unknown',
+                    uniqueId: userData.uniqueId || '',
                     ...userData
                 });
             }
@@ -2100,6 +2171,7 @@ async function searchFriend() {
             <div class="friend-search-result">
                 <div class="friend-search-result-info">
                     <div class="friend-search-result-name">${user.name}</div>
+                    ${user.uniqueId ? `<div class="friend-search-result-id">ID: ${user.uniqueId}</div>` : ''}
                 </div>
                 <button class="btn btn-primary btn-sm" onclick="sendFriendRequest('${user.id}', '${user.name.replace(/'/g, "\\'")}')">Add Friend</button>
             </div>
@@ -3965,6 +4037,7 @@ window.hideFriendsButton = hideFriendsButton;
 window.checkFriendRequestNotifications = checkFriendRequestNotifications;
 window.loadState = loadState; // Make available for firebase-init.js
 window.joinFriendTracker = joinFriendTracker;
+window.getOrCreateUniqueId = getOrCreateUniqueId; // Make available for firebase-init.js
 window.viewFriendTracker = viewFriendTracker;
 window.requestEditingAccess = requestEditingAccess;
 window.grantEditingAccess = grantEditingAccess;

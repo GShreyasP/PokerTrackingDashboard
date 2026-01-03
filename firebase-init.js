@@ -43,9 +43,19 @@ async function initFirebase() {
                 
                 // Save user profile to Firestore
                 const userRef = window.firebaseDb.collection('users').doc(user.uid);
+                const userDoc = await userRef.get();
+                const userData = userDoc.exists ? userDoc.data() : {};
+                
+                // Ensure unique ID exists
+                let uniqueId = userData.uniqueId;
+                if (!uniqueId && window.getOrCreateUniqueId) {
+                    uniqueId = await window.getOrCreateUniqueId(user.uid);
+                }
+                
                 await userRef.set({
                     email: user.email,
                     displayName: user.displayName || user.email,
+                    uniqueId: uniqueId,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
                 
@@ -156,6 +166,15 @@ function showAuthenticatedView(user) {
     if (headerUserInfo && headerUserName) {
         headerUserName.textContent = user.displayName || user.email;
         headerUserInfo.classList.remove('hidden');
+        
+        // Get and display unique ID
+        if (window.getOrCreateUniqueId) {
+            const uniqueId = await window.getOrCreateUniqueId(user.uid);
+            const headerUserId = document.getElementById('header-user-id');
+            if (headerUserId && uniqueId) {
+                headerUserId.textContent = `ID: ${uniqueId}`;
+            }
+        }
     }
     
     // Setup section and tracking section visibility will be handled by loadUserData
