@@ -164,6 +164,19 @@ function showAuthenticatedView(user) {
     }, 500);
 }
 
+// Ensure Friends button is hidden on initial page load (before Firebase initializes)
+(function() {
+    const friendsBtn = document.getElementById('friends-btn');
+    if (friendsBtn) {
+        friendsBtn.classList.add('hidden');
+    }
+    // Also show auth page by default
+    const authPage = document.getElementById('auth-page');
+    if (authPage) {
+        authPage.classList.remove('hidden');
+    }
+})();
+
 // Initialize when page loads
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initFirebase);
