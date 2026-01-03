@@ -324,6 +324,23 @@ h3 {
     box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
 }
 
+.tracker-limit-error {
+    background: #f8d7da;
+    color: #721c24;
+    padding: 12px 20px;
+    border-radius: 8px;
+    margin-top: 15px;
+    margin-bottom: 20px;
+    font-size: 0.95em;
+    border-left: 4px solid #dc3545;
+    text-align: center;
+    font-weight: 500;
+}
+
+.your-tables-section {
+    margin-top: 30px;
+}
+
 .live-tables-section {
     margin-top: 30px;
 }

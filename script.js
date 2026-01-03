@@ -19,8 +19,13 @@ let state = {
         red: 0,
         blue: 0
     },
-    transactions: []
+    transactions: [],
+    trackerId: null, // ID of current tracker (for multi-tracker support)
+    trackerName: null // Name of current tracker
 };
+
+// User's trackers list (for multi-tracker support)
+let userTrackers = [];
 
 // Tracker viewing state
 let trackerViewState = {
@@ -162,15 +167,42 @@ async function loadUserData(userId) {
         const docRef = window.firebaseDb.collection('users').doc(userId);
         const doc = await docRef.get();
         
-        if (doc.exists && doc.data().state) {
+        if (doc.exists) {
             const data = doc.data();
-            restoreState(data.state);
+            
+            // Check if user has trackers array (new multi-tracker system)
+            if (data.trackers && data.trackers.length > 0) {
+                // Load the most recently updated tracker
+                const sortedTrackers = data.trackers.sort((a, b) => {
+                    const dateA = new Date(a.updatedAt || 0);
+                    const dateB = new Date(b.updatedAt || 0);
+                    return dateB - dateA;
+                });
+                
+                const latestTracker = sortedTrackers[0];
+                restoreState(latestTracker.state);
+                state.trackerId = latestTracker.id;
+                state.trackerName = latestTracker.name;
+                
+                // Store all trackers
+                userTrackers = data.trackers;
+            } else if (data.state) {
+                // Fallback to old single-tracker system
+                restoreState(data.state);
+            } else {
+                // No data in Firestore, try localStorage
+                const hasLocalData = loadState();
+                // If no local data either, show main screen
+                if (!hasLocalData) {
+                    await showMainScreen();
+                }
+            }
         } else {
             // No data in Firestore, try localStorage
             const hasLocalData = loadState();
             // If no local data either, show main screen
             if (!hasLocalData) {
-                showMainScreen();
+                await showMainScreen();
             }
         }
     } catch (error) {
@@ -178,20 +210,21 @@ async function loadUserData(userId) {
         // Fall back to localStorage
         const hasLocalData = loadState();
         if (!hasLocalData) {
-            showMainScreen();
+            await showMainScreen();
         }
     }
 }
 
 // Show main screen
-function showMainScreen() {
+async function showMainScreen() {
     const mainScreen = document.getElementById('main-screen');
     const setupSection = document.getElementById('setup-section');
     const trackingSection = document.getElementById('tracking-section');
     if (mainScreen) {
         mainScreen.classList.remove('hidden');
-        // Load live tables
+        // Load user trackers and live tables
         if (window.firebaseDb && window.currentUser) {
+            await loadUserTrackers();
             loadLiveTables();
         }
     }
@@ -200,7 +233,39 @@ function showMainScreen() {
 }
 
 // Show setup section
-function showSetupSection() {
+async function showSetupSection() {
+    // Check if user already has 2 trackers
+    if (window.firebaseDb && window.currentUser) {
+        try {
+            const userId = window.currentUser.uid;
+            const docRef = window.firebaseDb.collection('users').doc(userId);
+            const doc = await docRef.get();
+            
+            if (doc.exists) {
+                const userData = doc.data();
+                const trackers = userData.trackers || [];
+                
+                if (trackers.length >= 2) {
+                    // Show error message
+                    const errorDiv = document.getElementById('tracker-limit-error');
+                    if (errorDiv) {
+                        errorDiv.textContent = 'Upgrade to the next tier to create more tables';
+                        errorDiv.classList.remove('hidden');
+                    }
+                    return;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking tracker limit:', error);
+        }
+    }
+    
+    // Hide error message if visible
+    const errorDiv = document.getElementById('tracker-limit-error');
+    if (errorDiv) {
+        errorDiv.classList.add('hidden');
+    }
+    
     const mainScreen = document.getElementById('main-screen');
     const setupSection = document.getElementById('setup-section');
     const trackingSection = document.getElementById('tracking-section');
@@ -258,10 +323,42 @@ async function saveState() {
             const userId = window.currentUser.uid;
             const docRef = window.firebaseDb.collection('users').doc(userId);
             const stateToSave = prepareStateForFirestore(state);
-            await docRef.set({
-                state: stateToSave,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
+            
+            // If we have a tracker ID, also update it in the trackers array
+            if (state.trackerId) {
+                const doc = await docRef.get();
+                let trackers = [];
+                if (doc.exists && doc.data().trackers) {
+                    trackers = doc.data().trackers;
+                }
+                
+                const existingIndex = trackers.findIndex(t => t.id === state.trackerId);
+                const trackerData = {
+                    id: state.trackerId,
+                    name: state.trackerName || `Table ${new Date().toLocaleDateString()}`,
+                    state: stateToSave,
+                    updatedAt: new Date().toISOString()
+                };
+                
+                if (existingIndex >= 0) {
+                    trackers[existingIndex] = trackerData;
+                } else {
+                    trackers.push(trackerData);
+                }
+                
+                await docRef.set({
+                    state: stateToSave, // Keep for backward compatibility
+                    trackers: trackers,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            } else {
+                // No tracker ID, just save state (backward compatibility)
+                await docRef.set({
+                    state: stateToSave,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            }
+            
             console.log('State saved successfully to Firestore');
         } catch (error) {
             console.error('Error saving to Firestore:', error);
@@ -634,7 +731,7 @@ function toggleChipValueMode() {
 }
 
 // Start tracking - go directly to dashboard
-function startTracking() {
+async function startTracking() {
     // Validate all required fields
     const numPeople = parseInt(numPeopleInput.value);
     const stackValue = parseFloat(stackValueInput.value);
@@ -726,6 +823,51 @@ function startTracking() {
         }
     }
     
+    // Generate tracker ID and name if this is a new tracker
+    if (!state.trackerId) {
+        state.trackerId = Date.now().toString(); // Simple ID generation
+        state.trackerName = `Table ${new Date().toLocaleDateString()}`;
+    }
+    
+    // Save this tracker to user's trackers array
+    if (window.firebaseDb && window.currentUser) {
+        try {
+            const userId = window.currentUser.uid;
+            const docRef = window.firebaseDb.collection('users').doc(userId);
+            const doc = await docRef.get();
+            
+            let trackers = [];
+            if (doc.exists && doc.data().trackers) {
+                trackers = doc.data().trackers;
+            }
+            
+            // Check if tracker already exists, update it; otherwise add new
+            const existingIndex = trackers.findIndex(t => t.id === state.trackerId);
+            const trackerData = {
+                id: state.trackerId,
+                name: state.trackerName,
+                state: prepareStateForFirestore(state),
+                updatedAt: new Date().toISOString()
+            };
+            
+            if (existingIndex >= 0) {
+                trackers[existingIndex] = trackerData;
+            } else {
+                trackers.push(trackerData);
+            }
+            
+            // Save trackers array
+            await docRef.set({
+                trackers: trackers,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            
+            console.log('Tracker saved to trackers array');
+        } catch (error) {
+            console.error('Error saving tracker:', error);
+        }
+    }
+    
     // Hide setup, show tracking
     setupSection.classList.add('hidden');
     trackingSection.classList.remove('hidden');
@@ -736,7 +878,12 @@ function startTracking() {
     updateChipValueDisplay();
     updateTotalChips();
     renderLog();
-    saveState();
+    
+    // Save current state (for backward compatibility)
+    await saveState();
+    
+    // Reload user trackers to update "Your Tables"
+    await loadUserTrackers();
 }
 
 // Show add person form
@@ -3090,6 +3237,111 @@ function hideViewingModeBanner() {
     }
 }
 
+// Load user's own trackers
+async function loadUserTrackers() {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const yourTablesContainer = document.getElementById('your-tables-container');
+    if (!yourTablesContainer) return;
+    
+    const currentUserId = window.currentUser.uid;
+    
+    try {
+        const docRef = window.firebaseDb.collection('users').doc(currentUserId);
+        const doc = await docRef.get();
+        
+        if (!doc.exists || !doc.data().trackers || doc.data().trackers.length === 0) {
+            yourTablesContainer.innerHTML = '<p class="no-live-tables">No tables created yet</p>';
+            userTrackers = [];
+            return;
+        }
+        
+        const trackers = doc.data().trackers;
+        userTrackers = trackers;
+        
+        if (trackers.length === 0) {
+            yourTablesContainer.innerHTML = '<p class="no-live-tables">No tables created yet</p>';
+            return;
+        }
+        
+        // Render user's trackers
+        yourTablesContainer.innerHTML = trackers.map(tracker => {
+            const trackerState = tracker.state || {};
+            const hasPeople = trackerState.people && trackerState.people.length > 0;
+            const trackerName = tracker.name || 'Untitled Table';
+            
+            return `
+                <div class="live-table-widget">
+                    <img src="assets/image-c90fcce1-ebd6-43e7-94b7-f3eb6415cdae.png" alt="Poker Table" class="live-table-image" onerror="this.style.display='none'">
+                    <div class="live-table-info">
+                        <h3>${trackerName}</h3>
+                        <div class="live-table-actions">
+                            <button class="btn btn-primary" onclick="loadUserTracker('${tracker.id}')">Open Table</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading user trackers:', error);
+        yourTablesContainer.innerHTML = '<p class="no-live-tables">Error loading your tables</p>';
+    }
+}
+
+// Load a specific user tracker
+async function loadUserTracker(trackerId) {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const currentUserId = window.currentUser.uid;
+    
+    try {
+        const docRef = window.firebaseDb.collection('users').doc(currentUserId);
+        const doc = await docRef.get();
+        
+        if (!doc.exists || !doc.data().trackers) {
+            showAlertModal('Tracker not found.');
+            return;
+        }
+        
+        const trackers = doc.data().trackers;
+        const tracker = trackers.find(t => t.id === trackerId);
+        
+        if (!tracker) {
+            showAlertModal('Tracker not found.');
+            return;
+        }
+        
+        // Restore the tracker state
+        restoreState(tracker.state);
+        state.trackerId = tracker.id;
+        state.trackerName = tracker.name;
+        
+        // Show tracking section
+        const mainScreen = document.getElementById('main-screen');
+        const setupSection = document.getElementById('setup-section');
+        const trackingSection = document.getElementById('tracking-section');
+        
+        if (mainScreen) mainScreen.classList.add('hidden');
+        if (setupSection) setupSection.classList.add('hidden');
+        if (trackingSection) trackingSection.classList.remove('hidden');
+        
+        // Render widgets and update display
+        renderPeopleWidgets();
+        updateTotalPot();
+        updateChipValueDisplay();
+        updateTotalChips();
+        renderLog();
+        
+        // Update UI based on viewing mode
+        trackerViewState.isViewingFriendTracker = false;
+        trackerViewState.isOwner = true;
+        updateUIForViewingMode(true);
+    } catch (error) {
+        console.error('Error loading user tracker:', error);
+        showAlertModal('Error loading tracker. Please try again.');
+    }
+}
+
 // Load live tables (friends' active trackers)
 async function loadLiveTables() {
     if (!window.firebaseDb || !window.currentUser || !liveTablesContainer) return;
@@ -3428,6 +3680,8 @@ window.confirmAmountInput = confirmAmountInput;
 window.closeAlertModal = closeAlertModal;
 window.requestJoinTracker = requestJoinTracker;
 window.loadLiveTables = loadLiveTables;
+window.loadUserTrackers = loadUserTrackers;
+window.loadUserTracker = loadUserTracker;
 window.approveJoinRequest = approveJoinRequest;
 window.declineJoinRequest = declineJoinRequest;
 window.revokeFriendEditAccess = revokeFriendEditAccess;
