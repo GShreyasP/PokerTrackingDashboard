@@ -20,7 +20,8 @@ let trackerViewState = {
     isViewingFriendTracker: false,
     viewingTrackerOwnerId: null,
     hasEditAccess: false,
-    isOwner: true
+    isOwner: true,
+    ownTrackerState: null // Store user's own tracker state when switching to friend's tracker
 };
 
 // DOM Elements
@@ -1972,14 +1973,15 @@ async function loadFriendsList() {
                                 <div class="friend-item-status online">Online</div>
                             </div>
                         </div>
-                        <div class="friend-item-actions">
+                        <div class="friend-item-actions" style="display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
                             ${hasActiveTracker && isOwnTracker ? `
                                 ${hasEditAccess ? `
                                     <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); revokeFriendEditAccess('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')" style="background: #dc3545; color: white; padding: 5px 10px; font-size: 0.85em;">Remove Edit Access</button>
                                 ` : `
                                     <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); grantFriendEditAccess('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')">Grant Edit Access</button>
                                 `}
-                            ` : hasTracker ? `
+                            ` : ''}
+                            ${hasTracker ? `
                                 ${hasAccess ? `
                                     <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); viewFriendTracker('${friend.id}')">View Tracker</button>
                                 ` : `
@@ -2015,14 +2017,15 @@ async function loadFriendsList() {
                                 <div class="friend-item-status offline">Offline</div>
                             </div>
                         </div>
-                        <div class="friend-item-actions">
+                        <div class="friend-item-actions" style="display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
                             ${hasActiveTracker && isOwnTracker ? `
                                 ${hasEditAccess ? `
                                     <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); revokeFriendEditAccess('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')" style="background: #dc3545; color: white; padding: 5px 10px; font-size: 0.85em;">Remove Edit Access</button>
                                 ` : `
                                     <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); grantFriendEditAccess('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')">Grant Edit Access</button>
                                 `}
-                            ` : hasTracker ? `
+                            ` : ''}
+                            ${hasTracker ? `
                                 ${hasAccess ? `
                                     <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); viewFriendTracker('${friend.id}')">View Tracker</button>
                                 ` : `
@@ -2314,6 +2317,14 @@ async function joinFriendTracker(friendId, friendName) {
     const currentUserId = window.currentUser.uid;
     
     try {
+        // If currently viewing own tracker, save it first
+        if (!trackerViewState.isViewingFriendTracker && state.people && state.people.length > 0) {
+            // Save current tracker state to Firestore
+            await saveState();
+            // Also store in memory for quick restoration
+            trackerViewState.ownTrackerState = JSON.parse(JSON.stringify(state));
+        }
+        
         // Check if access already exists
         const existingAccess = await checkTrackerAccess(friendId);
         if (existingAccess) {
@@ -2344,6 +2355,14 @@ async function viewFriendTracker(friendId) {
     if (!window.firebaseDb) return;
     
     try {
+        // If currently viewing own tracker, save it first
+        if (!trackerViewState.isViewingFriendTracker && state.people && state.people.length > 0) {
+            // Save current tracker state to Firestore
+            await saveState();
+            // Also store in memory for quick restoration
+            trackerViewState.ownTrackerState = JSON.parse(JSON.stringify(state));
+        }
+        
         // Check access
         const hasAccess = await checkTrackerAccess(friendId);
         if (!hasAccess) {
@@ -2563,14 +2582,20 @@ async function returnToOwnTracker() {
     if (!window.firebaseDb || !window.currentUser) return;
     
     try {
+        // If we have saved state, restore it (faster)
+        if (trackerViewState.ownTrackerState) {
+            restoreState(trackerViewState.ownTrackerState);
+            trackerViewState.ownTrackerState = null;
+        } else {
+            // Otherwise load from Firestore
+            await loadUserData(window.currentUser.uid);
+        }
+        
         // Reset viewing state
         trackerViewState.isViewingFriendTracker = false;
         trackerViewState.viewingTrackerOwnerId = null;
         trackerViewState.hasEditAccess = false;
         trackerViewState.isOwner = true;
-        
-        // Load own state
-        await loadUserData(window.currentUser.uid);
         
         // Update UI for owner mode
         updateUIForViewingMode(true);
