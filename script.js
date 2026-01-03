@@ -453,6 +453,12 @@ async function signOut() {
 
 // Reset all data
 async function resetData() {
+    // Don't allow reset if viewing friend's tracker
+    if (trackerViewState.isViewingFriendTracker) {
+        alert('You cannot reset data when viewing a friend\'s tracker.');
+        return;
+    }
+    
     if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
         // Clear localStorage
         localStorage.removeItem('pokerTrackerState');
@@ -1868,7 +1874,7 @@ async function loadFriendsList() {
                         <div class="friend-item-actions">
                             ${hasActiveTracker && isOwnTracker ? `
                                 ${hasEditAccess ? `
-                                    <span style="font-size: 0.85em; color: #28a745; margin-right: 10px;">Can Edit</span>
+                                    <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); revokeFriendEditAccess('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')" style="background: #dc3545; color: white; padding: 5px 10px; font-size: 0.85em;">Remove Edit Access</button>
                                 ` : `
                                     <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); grantFriendEditAccess('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')">Grant Edit Access</button>
                                 `}
@@ -1911,7 +1917,7 @@ async function loadFriendsList() {
                         <div class="friend-item-actions">
                             ${hasActiveTracker && isOwnTracker ? `
                                 ${hasEditAccess ? `
-                                    <span style="font-size: 0.85em; color: #28a745; margin-right: 10px;">Can Edit</span>
+                                    <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); revokeFriendEditAccess('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')" style="background: #dc3545; color: white; padding: 5px 10px; font-size: 0.85em;">Remove Edit Access</button>
                                 ` : `
                                     <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); grantFriendEditAccess('${friend.id}', '${friend.name.replace(/'/g, "\\'")}')">Grant Edit Access</button>
                                 `}
@@ -2152,6 +2158,45 @@ async function grantFriendEditAccess(friendId, friendName) {
     } catch (error) {
         console.error('Error granting friend edit access:', error);
         alert('Error granting access. Please try again.');
+    }
+}
+
+// Revoke friend edit access to current user's tracker
+async function revokeFriendEditAccess(friendId, friendName) {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    if (!confirm('Are you sure you want to remove edit access from ' + friendName + '? They will still be able to view your tracker in read-only mode.')) {
+        return;
+    }
+    
+    const currentUserId = window.currentUser.uid;
+    
+    try {
+        // Find and update the access record to remove edit access
+        const accessRef = window.firebaseDb.collection('trackerAccess');
+        const accessSnapshot = await accessRef
+            .where('trackerOwnerId', '==', currentUserId)
+            .where('userId', '==', friendId)
+            .where('status', '==', 'active')
+            .get();
+        
+        if (!accessSnapshot.empty) {
+            // Update existing access to remove edit permissions (set hasEditAccess to false)
+            const accessDoc = accessSnapshot.docs[0];
+            await accessDoc.ref.update({
+                hasEditAccess: false
+            });
+            
+            alert('Edit access removed from ' + friendName + '. They can still view your tracker in read-only mode.');
+        } else {
+            alert('No access record found.');
+        }
+        
+        // Reload friends list
+        loadFriendsList();
+    } catch (error) {
+        console.error('Error revoking friend edit access:', error);
+        alert('Error removing edit access. Please try again.');
     }
 }
 
@@ -2439,18 +2484,34 @@ async function returnToOwnTracker() {
 // Update UI for viewing mode (read-only vs editable)
 function updateUIForViewingMode(hasEditAccess) {
     const canEdit = trackerViewState.isOwner || hasEditAccess;
+    const isViewingFriendTracker = trackerViewState.isViewingFriendTracker;
     
     // Disable/enable all action buttons
     document.querySelectorAll('.btn-add, .btn-remove, .btn-add-person, .btn-settlement').forEach(btn => {
         if (canEdit) {
             btn.disabled = false;
             btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
         } else {
             btn.disabled = true;
             btn.style.opacity = '0.5';
             btn.style.cursor = 'not-allowed';
         }
     });
+    
+    // Disable reset button if viewing friend's tracker (even with edit access)
+    const resetBtn = document.getElementById('reset-btn');
+    if (resetBtn) {
+        if (isViewingFriendTracker) {
+            resetBtn.disabled = true;
+            resetBtn.style.opacity = '0.5';
+            resetBtn.style.cursor = 'not-allowed';
+        } else {
+            resetBtn.disabled = false;
+            resetBtn.style.opacity = '1';
+            resetBtn.style.cursor = 'pointer';
+        }
+    }
     
     // Disable/enable forms
     document.querySelectorAll('#setup-section input, #setup-section button, .widget-form input, .widget-form button').forEach(element => {
@@ -2569,6 +2630,7 @@ window.declineEditingAccess = declineEditingAccess;
 window.returnToOwnTracker = returnToOwnTracker;
 window.showFriendTrackerOptions = showFriendTrackerOptions;
 window.grantFriendEditAccess = grantFriendEditAccess;
+window.revokeFriendEditAccess = revokeFriendEditAccess;
 
 // Initialize on page load
 // Firebase auth state change will handle showing auth page or authenticated content
