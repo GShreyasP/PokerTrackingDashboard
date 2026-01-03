@@ -1271,12 +1271,13 @@ h3 {
 
 .friends-search {
     display: flex;
+    flex-direction: column;
     gap: 10px;
     margin-bottom: 15px;
 }
 
 .friends-search .form-input {
-    flex: 1;
+    width: 100%;
 }
 
 .btn-sm {
@@ -1335,12 +1336,13 @@ h3 {
 
 .invite-link-container {
     display: flex;
+    flex-direction: column;
     gap: 10px;
     margin-bottom: 8px;
 }
 
 .invite-link-text {
-    flex: 1;
+    width: 100%;
     padding: 12px;
     background: #f8f9fa;
     border: 2px solid #e0e0e0;
@@ -1350,10 +1352,6 @@ h3 {
     word-break: break-all;
     line-height: 1.4;
     min-height: 20px;
-}
-
-.invite-link-container {
-    align-items: center;
 }
 
 .friends-invite-section small {
