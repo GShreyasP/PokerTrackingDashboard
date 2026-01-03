@@ -1251,7 +1251,7 @@ function renderPersonalLog(personId) {
             <div class="log-time">${dateStr} ${timeStr}</div>
             <div class="log-details">
                 <span class="log-action">${typeText}</span>
-                <span class="log-amount">${sign}$${transaction.amount.toFixed(2)}</span>
+                <span class="log-amount">${sign}$${(transaction.amount || 0).toFixed(2)}</span>
             </div>
         `;
         
