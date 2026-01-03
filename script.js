@@ -2896,12 +2896,13 @@ async function showViewingModeBanner(trackerOwnerId, hasEditAccess) {
         color: white;
         padding: 15px 20px;
         text-align: center;
-        z-index: 9999;
+        z-index: 10000;
         box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         display: flex;
         justify-content: center;
         align-items: center;
         gap: 20px;
+        flex-wrap: wrap;
     `;
     
     const message = hasEditAccess 
@@ -2916,8 +2917,18 @@ async function showViewingModeBanner(trackerOwnerId, hasEditAccess) {
     
     document.body.insertBefore(banner, document.body.firstChild);
     
-    // Add padding to body to account for banner
-    document.body.style.paddingTop = '60px';
+    // Calculate banner height
+    const bannerHeight = banner.offsetHeight;
+    
+    // Add margin-top to container to account for fixed banner
+    const container = document.querySelector('.container');
+    if (container) {
+        container.style.marginTop = bannerHeight + 'px';
+    }
+    
+    // Also add padding to body for spacing
+    const currentBodyPadding = parseInt(window.getComputedStyle(document.body).paddingTop) || 0;
+    document.body.style.paddingTop = (currentBodyPadding + bannerHeight) + 'px';
 }
 
 // Hide viewing mode banner
@@ -2925,7 +2936,18 @@ function hideViewingModeBanner() {
     const banner = document.getElementById('viewing-mode-banner');
     if (banner) {
         banner.remove();
-        document.body.style.paddingTop = '';
+        
+        // Reset container margin
+        const container = document.querySelector('.container');
+        if (container) {
+            container.style.marginTop = '';
+        }
+        
+        // Reset body padding (remove only the banner height portion)
+        const currentBodyPadding = parseInt(window.getComputedStyle(document.body).paddingTop) || 0;
+        const bannerHeight = banner.offsetHeight || 60;
+        const newPadding = Math.max(20, currentBodyPadding - bannerHeight);
+        document.body.style.paddingTop = newPadding + 'px';
     }
 }
 
