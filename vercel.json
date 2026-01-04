@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "echo 'Building...' && ls -lh assets/icon-*.png apple-touch-icon.png",
+  "buildCommand": null,
   "outputDirectory": ".",
   "installCommand": null,
   "framework": null,
