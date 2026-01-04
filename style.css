@@ -1817,6 +1817,19 @@ h3 {
     background: #00acc1;
 }
 
+/* Install Instructions Modal - White text for readability */
+#install-instructions-modal .custom-modal-body {
+    color: white;
+}
+
+#install-instructions-modal .custom-modal-body ol {
+    color: white;
+}
+
+#install-instructions-modal .custom-modal-body li {
+    color: white;
+}
+
 /* Install App Button */
 .btn-install {
     background: #667eea;
