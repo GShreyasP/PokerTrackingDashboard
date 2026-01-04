@@ -480,10 +480,12 @@ async function showMainScreen() {
     const setupSection = document.getElementById('setup-section');
     const trackingSection = document.getElementById('tracking-section');
     const authPage = document.getElementById('auth-page');
+    const analyticsPage = document.getElementById('analytics-page');
     const backToHomeBtn = document.getElementById('back-to-main-btn');
     
-    // Hide auth page if visible
+    // Hide auth page and analytics page if visible
     if (authPage) authPage.classList.add('hidden');
+    if (analyticsPage) analyticsPage.classList.add('hidden');
     
     if (mainScreen) {
         mainScreen.classList.remove('hidden');
@@ -954,6 +956,64 @@ async function deleteCurrentTable() {
     }
 
     if (confirm('Are you sure you want to delete this table? This cannot be undone.')) {
+        // Record analytics before deleting (if user is in the tracker)
+        if (window.firebaseDb && window.currentUser && state.people && state.people.length > 0) {
+            try {
+                const userId = window.currentUser.uid;
+                const userDocRef = window.firebaseDb.collection('users').doc(userId);
+                const userDoc = await userDocRef.get();
+                
+                // Get user's name for matching
+                let userName = window.currentUser.displayName || '';
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    if (userData.name) {
+                        userName = userData.name;
+                    } else if (!userName && userData.email) {
+                        userName = userData.email.split('@')[0];
+                    }
+                }
+                
+                // Find the user in the people array (match by name)
+                const userPerson = state.people.find(person => {
+                    const personName = (person.name || '').trim().toLowerCase();
+                    const searchName = userName.trim().toLowerCase();
+                    return personName === searchName || personName.includes(searchName) || searchName.includes(personName);
+                });
+                
+                // If user is found in the tracker, record analytics
+                if (userPerson) {
+                    const finalPNL = (userPerson.moneyReturned || 0) - (userPerson.moneyPutIn || 0);
+                    const gameDate = state.trackerName ? extractDateFromTrackerName(state.trackerName) : new Date();
+                    
+                    // Get existing analytics or create new array
+                    const existingData = userDoc.exists ? userDoc.data() : {};
+                    const existingAnalytics = existingData.analytics || [];
+                    
+                    // Add new game record
+                    const newGameRecord = {
+                        date: gameDate,
+                        pnl: finalPNL,
+                        trackerId: state.trackerId,
+                        trackerName: state.trackerName || 'Unknown Table'
+                    };
+                    
+                    existingAnalytics.push(newGameRecord);
+                    
+                    // Update user document with analytics (merge to preserve other data)
+                    await userDocRef.set({
+                        analytics: existingAnalytics,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    
+                    console.log('Analytics recorded:', newGameRecord);
+                }
+            } catch (error) {
+                console.error('Error recording analytics:', error);
+                // Don't block deletion if analytics fails
+            }
+        }
+        
         // Delete from Firestore trackers array
         if (window.firebaseDb && window.currentUser) {
             try {
@@ -1012,6 +1072,22 @@ async function deleteCurrentTable() {
         // Show main screen (which will load remaining trackers)
         await showMainScreen();
     }
+}
+
+// Extract date from tracker name (e.g., "Table 1/3/2026" -> Date object)
+function extractDateFromTrackerName(trackerName) {
+    try {
+        // Try to parse date from common formats
+        const dateMatch = trackerName.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (dateMatch) {
+            const [, month, day, year] = dateMatch;
+            return new Date(year, month - 1, day);
+        }
+    } catch (error) {
+        console.error('Error extracting date from tracker name:', error);
+    }
+    // Fallback to current date
+    return new Date();
 }
 
 // Toggle between same/different chip values
