@@ -18,6 +18,7 @@
         <div class="page-header">
             <h1>Poker Money Tracker</h1>
             <div class="header-actions-right">
+                <button id="install-app-btn" class="btn btn-install hidden" onclick="showInstallInstructions()">Install App</button>
                 <button id="friends-btn" class="btn btn-friends hidden" onclick="toggleFriendsSidebar()">
                     Friends
                     <span id="friends-notification-badge" class="notification-badge hidden">0</span>
@@ -349,6 +350,26 @@
         <div id="sidebar-overlay" class="sidebar-overlay hidden" onclick="toggleFriendsSidebar()"></div>
         
         <!-- Custom Modal for Amount Input -->
+        <!-- Install Instructions Modal -->
+        <div id="install-instructions-modal" class="custom-modal hidden" onclick="if(event.target === this) closeInstallInstructions()">
+            <div class="custom-modal-content" onclick="event.stopPropagation()">
+                <div class="custom-modal-header">
+                    <h2>Install App</h2>
+                    <button class="modal-close-btn" onclick="closeInstallInstructions()">×</button>
+                </div>
+                <div class="custom-modal-body">
+                    <ol style="text-align: left; padding-left: 20px; line-height: 1.8;">
+                        <li>Press Share (found in browser)</li>
+                        <li>Scroll down to find "Add to Home"</li>
+                        <li>Leave everything as is and press "Add"</li>
+                    </ol>
+                </div>
+                <div class="custom-modal-footer">
+                    <button class="btn btn-primary" onclick="closeInstallInstructions()">Got it</button>
+                </div>
+            </div>
+        </div>
+        
         <div id="amount-input-modal" class="custom-modal hidden" onclick="if(event.target === this) closeAmountInputModal()">
             <div class="custom-modal-content" onclick="event.stopPropagation()">
                 <div class="custom-modal-header">

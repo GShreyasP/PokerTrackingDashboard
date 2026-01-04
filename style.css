@@ -1816,3 +1816,20 @@ h3 {
 .custom-modal-footer .btn-primary:hover {
     background: #00acc1;
 }
+
+/* Install App Button */
+.btn-install {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.3s;
+}
+
+.btn-install:hover {
+    background: #5568d3;
+}

@@ -4229,6 +4229,24 @@ window.approveJoinRequest = approveJoinRequest;
 window.declineJoinRequest = declineJoinRequest;
 window.revokeFriendEditAccess = revokeFriendEditAccess;
 
+// Install Instructions Modal Functions
+function showInstallInstructions() {
+    const modal = document.getElementById('install-instructions-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+}
+
+function closeInstallInstructions() {
+    const modal = document.getElementById('install-instructions-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+window.showInstallInstructions = showInstallInstructions;
+window.closeInstallInstructions = closeInstallInstructions;
+
 // Initialize on page load
 // Firebase auth state change will handle showing auth page or authenticated content
 // If Firebase doesn't load, show auth page after timeout

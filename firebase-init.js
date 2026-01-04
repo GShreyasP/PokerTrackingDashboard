@@ -124,6 +124,7 @@ function showAuthPage() {
     const headerUserInfo = document.getElementById('header-user-info');
     const friendsBtn = document.getElementById('friends-btn');
     const backToHomeBtn = document.getElementById('back-to-main-btn');
+    const installAppBtn = document.getElementById('install-app-btn');
     
     if (authPage) authPage.classList.remove('hidden');
     if (setupSection) setupSection.classList.add('hidden');
@@ -138,19 +139,32 @@ function showAuthPage() {
     }
     
     if (backToHomeBtn) backToHomeBtn.classList.add('hidden');
+    
+    // Show install app button on auth page
+    if (installAppBtn) {
+        installAppBtn.classList.remove('hidden');
+        installAppBtn.style.display = '';
+    }
 }
 
 // Show authenticated view (setup or tracking)
 async function showAuthenticatedView(user) {
     const authPage = document.getElementById('auth-page');
     const friendsBtn = document.getElementById('friends-btn');
+    const installAppBtn = document.getElementById('install-app-btn');
     const userInfo = document.getElementById('user-info');
     const userName = document.getElementById('user-name');
     const headerUserInfo = document.getElementById('header-user-info');
     const headerUserName = document.getElementById('header-user-name');
     
     if (authPage) authPage.classList.add('hidden');
-    
+
+    // Hide install app button when authenticated
+    if (installAppBtn) {
+        installAppBtn.classList.add('hidden');
+        installAppBtn.style.display = 'none';
+    }
+
     // Ensure friends button is hidden until explicitly shown after auth page is hidden
     if (friendsBtn) {
         friendsBtn.classList.add('hidden');
