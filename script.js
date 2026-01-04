@@ -485,6 +485,13 @@ async function showMainScreen() {
     // Hide auth page if visible
     if (authPage) authPage.classList.add('hidden');
     
+    // Ensure setup section is hidden first
+    if (setupSection) {
+        setupSection.classList.add('hidden');
+        setupSection.style.display = 'none'; // Force hide
+    }
+    if (trackingSection) trackingSection.classList.add('hidden');
+    
     if (mainScreen) {
         mainScreen.classList.remove('hidden');
         // Load user trackers and live tables
@@ -493,8 +500,6 @@ async function showMainScreen() {
             loadLiveTables();
         }
     }
-    if (setupSection) setupSection.classList.add('hidden');
-    if (trackingSection) trackingSection.classList.add('hidden');
     
     // Hide back to home button when on main screen (you're already home!)
     if (backToHomeBtn) {
@@ -553,7 +558,10 @@ async function showSetupSection() {
     const backToHomeBtn = document.getElementById('back-to-main-btn');
     
     if (mainScreen) mainScreen.classList.add('hidden');
-    if (setupSection) setupSection.classList.remove('hidden');
+    if (setupSection) {
+        setupSection.classList.remove('hidden');
+        setupSection.style.display = ''; // Remove inline style to show
+    }
     if (trackingSection) trackingSection.classList.add('hidden');
     
     // Show back to home button when in setup (if authenticated)
