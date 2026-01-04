@@ -197,6 +197,13 @@ async function showAuthenticatedView(user) {
         }
     }
     
+    // Show install button if PWA is installable (after user is authenticated)
+    if (window.showInstallButton) {
+        setTimeout(() => {
+            window.showInstallButton();
+        }, 1000);
+    }
+    
     // Setup section and tracking section visibility will be handled by loadUserData
     // But show setup section as default if loadUserData hasn't run yet
     setTimeout(() => {
