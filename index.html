@@ -33,12 +33,17 @@
             </div>
         </div>
         <script>
-            // Immediately hide friends button on page load (runs as soon as button exists in DOM)
+            // Immediately hide friends button and show install button on page load
             (function() {
                 const friendsBtn = document.getElementById('friends-btn');
                 if (friendsBtn) {
                     friendsBtn.classList.add('hidden');
                     friendsBtn.style.display = 'none';
+                }
+                const installAppBtn = document.getElementById('install-app-btn');
+                if (installAppBtn) {
+                    installAppBtn.classList.remove('hidden');
+                    installAppBtn.style.display = '';
                 }
             })();
         </script>

@@ -29,6 +29,13 @@ async function initFirebase() {
             friendsBtn.style.display = 'none'; // Force hide with inline style
         }
         
+        // Show install app button on initial load (auth page is shown by default)
+        const installAppBtn = document.getElementById('install-app-btn');
+        if (installAppBtn) {
+            installAppBtn.classList.remove('hidden');
+            installAppBtn.style.display = '';
+        }
+        
         // Listen for auth state changes
         window.firebaseAuth.onAuthStateChanged(async (user) => {
             if (user) {
