@@ -205,17 +205,8 @@ async function showAuthenticatedView(user) {
     }
     
     // Setup section and tracking section visibility will be handled by loadUserData
-    // But show setup section as default if loadUserData hasn't run yet
-    setTimeout(() => {
-        const setupSection = document.getElementById('setup-section');
-        const trackingSection = document.getElementById('tracking-section');
-        // If neither is visible, show setup section
-        if (setupSection && trackingSection) {
-            if (setupSection.classList.contains('hidden') && trackingSection.classList.contains('hidden')) {
-                setupSection.classList.remove('hidden');
-            }
-        }
-    }, 500);
+    // Don't auto-show setup section - let loadUserData decide what to show
+    // This prevents setup section from appearing on main screen
 }
 
 // Ensure Friends button is hidden on initial page load (before Firebase initializes)
