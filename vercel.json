@@ -1,20 +1,6 @@
 {
   "version": 2,
   "cleanUrls": true,
-  "rewrites": [
-    {
-      "source": "/apple-touch-icon-v2.png",
-      "destination": "/apple-touch-icon-v2.png"
-    },
-    {
-      "source": "/assets/icon-192-v2.png",
-      "destination": "/assets/icon-192-v2.png"
-    },
-    {
-      "source": "/assets/icon-512-v2.png",
-      "destination": "/assets/icon-512-v2.png"
-    }
-  ],
   "headers": [
     {
       "source": "/manifest.json",
