@@ -38,7 +38,7 @@
       ]
     },
     {
-      "source": "/apple-touch-icon.png",
+      "source": "/apple-touch-icon*.png",
       "headers": [
         {
           "key": "Content-Type",
