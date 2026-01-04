@@ -1,5 +1,5 @@
 // Service Worker for Poker Money Tracker PWA
-const CACHE_NAME = 'poker-tracker-v1';
+const CACHE_NAME = 'poker-tracker-v2';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -49,6 +49,17 @@ self.addEventListener('fetch', (event) => {
       event.request.url.includes('googleapis.com') ||
       event.request.url.includes('gstatic.com')) {
     return; // Let these go to network
+  }
+  
+  // Never cache icon files - always fetch fresh from network
+  if (event.request.url.includes('apple-touch-icon') || 
+      event.request.url.includes('icon-192') || 
+      event.request.url.includes('icon-512')) {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' })
+        .catch(() => caches.match(event.request))
+    );
+    return;
   }
 
   event.respondWith(
