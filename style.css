@@ -1828,6 +1828,12 @@ h3 {
     font-size: 14px;
     font-weight: 500;
     transition: background 0.3s;
+    display: inline-block !important;
+    visibility: visible !important;
+}
+
+.btn-install.hidden {
+    display: none !important;
 }
 
 .btn-install:hover {
