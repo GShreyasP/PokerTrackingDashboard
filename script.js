@@ -485,13 +485,6 @@ async function showMainScreen() {
     // Hide auth page if visible
     if (authPage) authPage.classList.add('hidden');
     
-    // Ensure setup section is hidden first
-    if (setupSection) {
-        setupSection.classList.add('hidden');
-        setupSection.style.display = 'none'; // Force hide
-    }
-    if (trackingSection) trackingSection.classList.add('hidden');
-    
     if (mainScreen) {
         mainScreen.classList.remove('hidden');
         // Load user trackers and live tables
@@ -500,6 +493,8 @@ async function showMainScreen() {
             loadLiveTables();
         }
     }
+    if (setupSection) setupSection.classList.add('hidden');
+    if (trackingSection) trackingSection.classList.add('hidden');
     
     // Hide back to home button when on main screen (you're already home!)
     if (backToHomeBtn) {
@@ -558,10 +553,7 @@ async function showSetupSection() {
     const backToHomeBtn = document.getElementById('back-to-main-btn');
     
     if (mainScreen) mainScreen.classList.add('hidden');
-    if (setupSection) {
-        setupSection.classList.remove('hidden');
-        setupSection.style.display = ''; // Remove inline style to show
-    }
+    if (setupSection) setupSection.classList.remove('hidden');
     if (trackingSection) trackingSection.classList.add('hidden');
     
     // Show back to home button when in setup (if authenticated)
@@ -4236,97 +4228,6 @@ window.loadUserTracker = loadUserTracker;
 window.approveJoinRequest = approveJoinRequest;
 window.declineJoinRequest = declineJoinRequest;
 window.revokeFriendEditAccess = revokeFriendEditAccess;
-
-// PWA Install Prompt Handler
-let deferredPrompt;
-let installButton = null;
-
-// Listen for the beforeinstallprompt event
-window.addEventListener('beforeinstallprompt', (e) => {
-    // Prevent the mini-infobar from appearing on mobile
-    e.preventDefault();
-    // Stash the event so it can be triggered later
-    deferredPrompt = e;
-    // Show install button if it exists
-    showInstallButton();
-});
-
-// Show install instructions if PWA is installable
-function showInstallButton() {
-    // Create install instructions if they don't exist
-    if (!installButton) {
-        installButton = document.createElement('div');
-        installButton.id = 'pwa-install-instructions';
-        installButton.className = 'pwa-install-instructions';
-        installButton.innerHTML = `
-            <h3>Install App</h3>
-            <ol>
-                <li>On your browser, click the Share button</li>
-                <li>Scroll down</li>
-                <li>Press "Add to Home Screen"</li>
-            </ol>
-        `;
-        
-        // Only show if user is authenticated (to avoid cluttering login screen)
-        if (window.currentUser && document.body) {
-            document.body.appendChild(installButton);
-        }
-    } else if (window.currentUser) {
-        installButton.style.display = 'block';
-    }
-}
-
-// Hide install button
-function hideInstallButton() {
-    if (installButton) {
-        installButton.style.display = 'none';
-    }
-}
-
-// Install PWA
-async function installPWA() {
-    if (!deferredPrompt) {
-        // Fallback: show instructions
-        showAlertModal('To install this app:\n\n' +
-            'Chrome Desktop: Look for the install icon (➕) in the address bar\n\n' +
-            'Chrome Mobile: Tap menu (⋮) → "Add to Home screen"\n\n' +
-            'Safari iOS: Tap Share (□↑) → "Add to Home Screen"');
-        return;
-    }
-    
-    // Show the install prompt
-    deferredPrompt.prompt();
-    
-    // Wait for the user to respond to the prompt
-    const { outcome } = await deferredPrompt.userChoice;
-    
-    if (outcome === 'accepted') {
-        console.log('User accepted the install prompt');
-        hideInstallButton();
-    } else {
-        console.log('User dismissed the install prompt');
-    }
-    
-    // Clear the deferredPrompt
-    deferredPrompt = null;
-}
-
-// Listen for app installed event
-window.addEventListener('appinstalled', () => {
-    console.log('PWA was installed');
-    hideInstallButton();
-    deferredPrompt = null;
-});
-
-// Check if app is already installed
-if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
-    // App is already installed
-    console.log('PWA is already installed');
-}
-
-// Make install function globally available
-window.installPWA = installPWA;
-window.showInstallButton = showInstallButton;
 
 // Initialize on page load
 // Firebase auth state change will handle showing auth page or authenticated content
