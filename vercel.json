@@ -1,5 +1,9 @@
 {
   "version": 2,
+  "buildCommand": null,
+  "outputDirectory": ".",
+  "installCommand": null,
+  "framework": null,
   "cleanUrls": true,
   "headers": [
     {
