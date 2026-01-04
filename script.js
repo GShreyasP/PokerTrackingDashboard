@@ -4229,6 +4229,105 @@ window.approveJoinRequest = approveJoinRequest;
 window.declineJoinRequest = declineJoinRequest;
 window.revokeFriendEditAccess = revokeFriendEditAccess;
 
+// Analytics Functions
+async function showAnalyticsPage() {
+    const mainScreen = document.getElementById('main-screen');
+    const analyticsPage = document.getElementById('analytics-page');
+    const setupSection = document.getElementById('setup-section');
+    const trackingSection = document.getElementById('tracking-section');
+    
+    if (mainScreen) mainScreen.classList.add('hidden');
+    if (setupSection) setupSection.classList.add('hidden');
+    if (trackingSection) trackingSection.classList.add('hidden');
+    if (analyticsPage) {
+        analyticsPage.classList.remove('hidden');
+        await loadAnalytics();
+    }
+}
+
+async function loadAnalytics() {
+    if (!window.firebaseDb || !window.currentUser) {
+        return;
+    }
+    
+    try {
+        const userId = window.currentUser.uid;
+        const userDocRef = window.firebaseDb.collection('users').doc(userId);
+        const userDoc = await userDocRef.get();
+        
+        if (!userDoc.exists) {
+            // No analytics data yet
+            displayAnalytics([]);
+            return;
+        }
+        
+        const userData = userDoc.data();
+        const analytics = userData.analytics || [];
+        
+        displayAnalytics(analytics);
+    } catch (error) {
+        console.error('Error loading analytics:', error);
+        showAlertModal('Error loading analytics. Please try again.');
+    }
+}
+
+function displayAnalytics(analytics) {
+    // Calculate totals
+    const totalPNL = analytics.reduce((sum, game) => sum + (game.pnl || 0), 0);
+    const gamesPlayed = analytics.length;
+    const avgPNL = gamesPlayed > 0 ? totalPNL / gamesPlayed : 0;
+    
+    // Update stat cards
+    const totalPNLElement = document.getElementById('total-pnl');
+    const gamesPlayedElement = document.getElementById('games-played');
+    const avgPNLElement = document.getElementById('avg-pnl');
+    
+    if (totalPNLElement) {
+        totalPNLElement.textContent = `${totalPNL >= 0 ? '+' : ''}$${totalPNL.toFixed(2)}`;
+        totalPNLElement.className = `stat-value ${totalPNL >= 0 ? 'pnl-positive' : 'pnl-negative'}`;
+    }
+    if (gamesPlayedElement) {
+        gamesPlayedElement.textContent = gamesPlayed.toString();
+    }
+    if (avgPNLElement) {
+        avgPNLElement.textContent = `${avgPNL >= 0 ? '+' : ''}$${avgPNL.toFixed(2)}`;
+        avgPNLElement.className = `stat-value ${avgPNL >= 0 ? 'pnl-positive' : 'pnl-negative'}`;
+    }
+    
+    // Display history
+    const historyList = document.getElementById('analytics-history-list');
+    if (historyList) {
+        if (analytics.length === 0) {
+            historyList.innerHTML = '<p class="no-analytics">No games recorded yet. Delete a table after playing to see analytics.</p>';
+        } else {
+            // Sort by date (newest first)
+            const sortedAnalytics = [...analytics].sort((a, b) => {
+                const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+                const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+                return dateB - dateA;
+            });
+            
+            historyList.innerHTML = sortedAnalytics.map(game => {
+                const gameDate = game.date?.toDate ? game.date.toDate() : new Date(game.date);
+                const dateStr = gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const pnl = game.pnl || 0;
+                const pnlClass = pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
+                const pnlSign = pnl >= 0 ? '+' : '';
+                
+                return `
+                    <div class="analytics-history-item">
+                        <div class="history-item-date">${dateStr}</div>
+                        <div class="history-item-name">${game.trackerName || 'Unknown Table'}</div>
+                        <div class="history-item-pnl ${pnlClass}">${pnlSign}$${Math.abs(pnl).toFixed(2)}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+}
+
+window.showAnalyticsPage = showAnalyticsPage;
+
 // Install Instructions Modal Functions
 function showInstallInstructions() {
     const modal = document.getElementById('install-instructions-modal');

@@ -128,6 +128,9 @@
                 <button id="create-tracker-btn" class="btn btn-primary btn-create-tracker" onclick="showSetupSection()">
                     + Create Your Own Table
                 </button>
+                <button id="analytics-btn" class="btn btn-secondary btn-analytics" onclick="showAnalyticsPage()">
+                    Analytics
+                </button>
                 <div id="tracker-limit-error" class="tracker-limit-error hidden"></div>
                 
                 <div class="your-tables-section">
@@ -141,6 +144,36 @@
                     <h2>Live Tables</h2>
                     <div id="live-tables-container" class="live-tables-container">
                         <p class="no-live-tables">No live tables available</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Analytics Page -->
+        <div id="analytics-page" class="analytics-page hidden">
+            <div class="analytics-content">
+                <div class="analytics-header">
+                    <h2>Analytics</h2>
+                    <button class="btn btn-secondary" onclick="showMainScreen()">Back to Home</button>
+                </div>
+                <div id="analytics-stats" class="analytics-stats">
+                    <div class="stat-card">
+                        <div class="stat-label">Total PNL</div>
+                        <div id="total-pnl" class="stat-value">$0.00</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Games Played</div>
+                        <div id="games-played" class="stat-value">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Average PNL per Game</div>
+                        <div id="avg-pnl" class="stat-value">$0.00</div>
+                    </div>
+                </div>
+                <div class="analytics-history">
+                    <h3>Game History</h3>
+                    <div id="analytics-history-list" class="analytics-history-list">
+                        <p class="no-analytics">No games recorded yet. Delete a table after playing to see analytics.</p>
                     </div>
                 </div>
             </div>
