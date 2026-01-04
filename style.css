@@ -1816,3 +1816,32 @@ h3 {
 .custom-modal-footer .btn-primary:hover {
     background: #00acc1;
 }
+
+/* PWA Install Instructions */
+.pwa-install-instructions {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px auto;
+    max-width: 400px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.pwa-install-instructions h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 1.2em;
+}
+
+.pwa-install-instructions ol {
+    margin: 0;
+    padding-left: 20px;
+    color: #666;
+}
+
+.pwa-install-instructions li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+}

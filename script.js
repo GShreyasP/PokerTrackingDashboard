@@ -4251,19 +4251,24 @@ window.addEventListener('beforeinstallprompt', (e) => {
     showInstallButton();
 });
 
-// Show install button if PWA is installable
+// Show install instructions if PWA is installable
 function showInstallButton() {
-    // Create install button if it doesn't exist
+    // Create install instructions if they don't exist
     if (!installButton) {
-        installButton = document.createElement('button');
-        installButton.id = 'pwa-install-btn';
-        installButton.className = 'btn btn-primary';
-        installButton.style.cssText = 'position: fixed; bottom: 20px; right: 20px; z-index: 1000; padding: 12px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);';
-        installButton.innerHTML = '📱 Install App';
-        installButton.onclick = installPWA;
+        installButton = document.createElement('div');
+        installButton.id = 'pwa-install-instructions';
+        installButton.className = 'pwa-install-instructions';
+        installButton.innerHTML = `
+            <h3>Install App</h3>
+            <ol>
+                <li>On your browser, click the Share button</li>
+                <li>Scroll down</li>
+                <li>Press "Add to Home Screen"</li>
+            </ol>
+        `;
         
         // Only show if user is authenticated (to avoid cluttering login screen)
-        if (window.currentUser) {
+        if (window.currentUser && document.body) {
             document.body.appendChild(installButton);
         }
     } else if (window.currentUser) {
