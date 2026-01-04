@@ -239,6 +239,12 @@ function ensureInitialState() {
         friendsBtn.classList.add('hidden');
         friendsBtn.style.display = 'none'; // Force hide with inline style
     }
+    // Show install app button on initial load (auth page is shown by default)
+    const installAppBtn = document.getElementById('install-app-btn');
+    if (installAppBtn) {
+        installAppBtn.classList.remove('hidden');
+        installAppBtn.style.display = '';
+    }
     // Also show auth page by default
     const authPage = document.getElementById('auth-page');
     if (authPage) {
