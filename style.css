@@ -1747,6 +1747,7 @@ h3 {
     border-bottom: 1px solid #3a3a3a;
 }
 
+.custom-modal-header h2,
 .custom-modal-header h3 {
     margin: 0;
     color: #ffffff;
