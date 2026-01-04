@@ -5,6 +5,11 @@
   "installCommand": null,
   "framework": null,
   "cleanUrls": true,
+  "git": {
+    "deploymentEnabled": {
+      "main": true
+    }
+  },
   "headers": [
     {
       "source": "/manifest.json",
