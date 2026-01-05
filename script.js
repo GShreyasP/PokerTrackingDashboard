@@ -1384,10 +1384,14 @@ function renderPeopleWidgets() {
         widget.id = `widget-${person.id}`;
         widget.innerHTML = `
             <div class="widget-header">
-                <input type="text" class="widget-name-input" value="${person.name || ''}" 
-                       onchange="updatePersonName(${person.id}, this.value)"
-                       onblur="updatePersonName(${person.id}, this.value)"
-                       placeholder="Person ${person.id + 1}">
+                <div class="name-input-wrapper">
+                    <input type="text" class="widget-name-input" id="person-name-${person.id}" value="${person.name || ''}" 
+                           oninput="searchPersonNames(${person.id}, this.value)"
+                           onchange="updatePersonName(${person.id}, this.value)"
+                           onblur="handlePersonNameBlur(${person.id}, this.value)"
+                           placeholder="Person ${person.id + 1}">
+                    <div id="person-search-dropdown-${person.id}" class="person-search-dropdown hidden"></div>
+                </div>
             </div>
             <div class="widget-balance ${balanceClass}">
                 <div class="balance-label">Balance</div>
@@ -1692,20 +1696,115 @@ function submitSubtract(personId) {
 }
 
 // Update person name
+// Search for person names and show dropdown
+let personSearchTimeout = {};
+async function searchPersonNames(personId, searchTerm) {
+    // Clear any existing timeout
+    if (personSearchTimeout[personId]) {
+        clearTimeout(personSearchTimeout[personId]);
+    }
+    
+    const dropdown = document.getElementById(`person-search-dropdown-${personId}`);
+    if (!dropdown) return;
+    
+    // Hide dropdown if search is empty
+    if (!searchTerm || searchTerm.trim().length < 1) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+    
+    // Debounce search
+    personSearchTimeout[personId] = setTimeout(async () => {
+        if (!window.firebaseDb || !window.currentUser) {
+            dropdown.classList.add('hidden');
+            return;
+        }
+        
+        try {
+            const searchTermLower = searchTerm.trim().toLowerCase();
+            const usersRef = window.firebaseDb.collection('users');
+            const snapshot = await usersRef.get();
+            
+            const results = [];
+            snapshot.forEach(doc => {
+                const userData = doc.data();
+                const userId = doc.id;
+                
+                const name = (userData.displayName || userData.name || userData.email || '').toLowerCase();
+                const uniqueId = (userData.uniqueId || '').toLowerCase();
+                const email = (userData.email || '').toLowerCase();
+                
+                if (name.includes(searchTermLower) || uniqueId.includes(searchTermLower) || email.includes(searchTermLower)) {
+                    results.push({
+                        id: userId,
+                        name: userData.displayName || userData.name || userData.email || 'Unknown',
+                        uniqueId: userData.uniqueId || '',
+                        email: userData.email || ''
+                    });
+                }
+            });
+            
+            // Limit to 5 results
+            const limitedResults = results.slice(0, 5);
+            
+            if (limitedResults.length === 0) {
+                dropdown.classList.add('hidden');
+            } else {
+                dropdown.innerHTML = limitedResults.map(user => `
+                    <div class="person-search-result" onclick="selectPersonFromSearch(${personId}, '${user.name.replace(/'/g, "\\'")}', '${user.uniqueId || ''}')">
+                        <div class="person-search-result-name">${user.name}</div>
+                        ${user.uniqueId ? `<div class="person-search-result-id">ID: ${user.uniqueId}</div>` : ''}
+                    </div>
+                `).join('');
+                dropdown.classList.remove('hidden');
+            }
+        } catch (error) {
+            console.error('Error searching for persons:', error);
+            dropdown.classList.add('hidden');
+        }
+    }, 300);
+}
+
+// Select person from search dropdown
+function selectPersonFromSearch(personId, name, uniqueId) {
+    const nameInput = document.getElementById(`person-name-${personId}`);
+    const dropdown = document.getElementById(`person-search-dropdown-${personId}`);
+    
+    if (nameInput) {
+        nameInput.value = name;
+        updatePersonName(personId, name);
+    }
+    
+    if (dropdown) {
+        dropdown.classList.add('hidden');
+    }
+}
+
+// Handle blur event (hide dropdown after a delay to allow click)
+function handlePersonNameBlur(personId, value) {
+    setTimeout(() => {
+        const dropdown = document.getElementById(`person-search-dropdown-${personId}`);
+        if (dropdown) {
+            dropdown.classList.add('hidden');
+        }
+        updatePersonName(personId, value);
+    }, 200);
+}
+
 function updatePersonName(personId, newName) {
     // Don't allow updating name if viewing friend's tracker without edit access
     if (trackerViewState.isViewingFriendTracker && !trackerViewState.hasEditAccess) {
         // Reset the input to the original name
         const person = state.people.find(p => p.id === personId);
         if (person) {
-            const nameInput = document.querySelector(`.widget-name-input[onchange*="${personId}"]`);
+            const nameInput = document.getElementById(`person-name-${personId}`);
             if (nameInput) {
                 nameInput.value = person.name || `Person ${personId + 1}`;
             }
         }
         return;
     }
-    
+
     const person = state.people.find(p => p.id === personId);
     if (person) {
         person.name = newName || `Person ${personId + 1}`;
@@ -4299,7 +4398,52 @@ window.confirmAmountInput = confirmAmountInput;
 window.closeAlertModal = closeAlertModal;
 window.requestJoinTracker = requestJoinTracker;
 window.loadLiveTables = loadLiveTables;
+// Update tracker name
+async function updateTrackerName(trackerId, newName) {
+    if (!window.firebaseDb || !window.currentUser) {
+        return;
+    }
+    
+    if (!newName || newName.trim() === '') {
+        // Reset to default if empty
+        newName = `Table ${new Date().toLocaleDateString()}`;
+    }
+    
+    try {
+        const userId = window.currentUser.uid;
+        const docRef = window.firebaseDb.collection('users').doc(userId);
+        const doc = await docRef.get();
+        
+        if (!doc.exists || !doc.data().trackers) {
+            return;
+        }
+        
+        const trackers = doc.data().trackers;
+        const trackerIndex = trackers.findIndex(t => t.id === trackerId);
+        
+        if (trackerIndex === -1) {
+            return;
+        }
+        
+        trackers[trackerIndex].name = newName.trim();
+        
+        await docRef.set({
+            trackers: trackers,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        
+        // Reload user trackers to update display
+        await loadUserTrackers();
+    } catch (error) {
+        console.error('Error updating tracker name:', error);
+        showAlertModal('Error updating table name. Please try again.');
+        // Reload to reset the input
+        await loadUserTrackers();
+    }
+}
+
 window.loadUserTrackers = loadUserTrackers;
+window.updateTrackerName = updateTrackerName;
 window.loadUserTracker = loadUserTracker;
 window.approveJoinRequest = approveJoinRequest;
 window.declineJoinRequest = declineJoinRequest;
@@ -4383,18 +4527,22 @@ function displayAnalytics(analytics) {
                 return dateB - dateA;
             });
             
-            historyList.innerHTML = sortedAnalytics.map(game => {
+            historyList.innerHTML = sortedAnalytics.map((game, index) => {
                 const gameDate = game.date?.toDate ? game.date.toDate() : new Date(game.date);
                 const dateStr = gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                 const pnl = game.pnl || 0;
                 const pnlClass = pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
                 const pnlSign = pnl >= 0 ? '+' : '';
                 
+                // Use trackerId or index as identifier for deletion
+                const gameIdentifier = game.trackerId || `index-${index}`;
+                
                 return `
                     <div class="analytics-history-item">
                         <div class="history-item-date">${dateStr}</div>
                         <div class="history-item-name">${game.trackerName || 'Unknown Table'}</div>
                         <div class="history-item-pnl ${pnlClass}">${pnlSign}$${Math.abs(pnl).toFixed(2)}</div>
+                        <button class="history-item-delete" onclick="deleteAnalyticsEntry('${gameIdentifier}')" title="Delete this entry">×</button>
                     </div>
                 `;
             }).join('');

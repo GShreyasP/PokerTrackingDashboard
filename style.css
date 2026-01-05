@@ -810,6 +810,82 @@ h3 {
     border-color: #667eea;
 }
 
+.name-input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.person-search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 2px solid #667eea;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: -2px;
+}
+
+.person-search-result {
+    padding: 12px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #e0e0e0;
+    transition: background 0.2s;
+}
+
+.person-search-result:last-child {
+    border-bottom: none;
+}
+
+.person-search-result:hover {
+    background: #f8f9fa;
+}
+
+.person-search-result-name {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 3px;
+}
+
+.person-search-result-id {
+    font-size: 0.85em;
+    color: #666;
+}
+
+.live-table-info h3 {
+    color: #333;
+    margin: 0 0 15px 0;
+    font-size: 1.3em;
+}
+
+.table-name-input {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1.3em;
+    font-weight: 600;
+    color: #333;
+    background: white;
+    text-align: center;
+    margin-bottom: 15px;
+    transition: border-color 0.3s;
+}
+
+.table-name-input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.table-name-input:hover {
+    border-color: #667eea;
+}
+
 .widget-balance {
     text-align: center;
     margin-bottom: 15px;
