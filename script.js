@@ -2236,14 +2236,6 @@ function renderLog() {
         
         logEntriesDiv.appendChild(logEntry);
     });
-    
-    // Add Clear Table button after transaction log entries
-    const clearTableBtn = document.createElement('button');
-    clearTableBtn.id = 'clear-table-btn';
-    clearTableBtn.className = 'btn btn-clear-table';
-    clearTableBtn.textContent = 'Clear Table';
-    clearTableBtn.onclick = clearTable;
-    logEntriesDiv.appendChild(clearTableBtn);
 }
 
 // Clear table (reset all data without affecting analytics)
@@ -4870,7 +4862,6 @@ window.showAnalyticsPage = showAnalyticsPage;
 window.deleteAnalyticsEntry = deleteAnalyticsEntry;
 window.clearTable = clearTable;
 window.selectPersonFromSearch = selectPersonFromSearch;
-window.deleteAnalyticsEntry = deleteAnalyticsEntry;
 
 // Install Instructions Modal Functions
 function showInstallInstructions() {
