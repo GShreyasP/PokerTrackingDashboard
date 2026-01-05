@@ -984,8 +984,23 @@ async function deleteCurrentTable() {
                 
                 // Process each person in the tracker
                 const analyticsPromises = [];
+                const currentUserId = window.currentUser.uid;
                 
                 console.log('Recording analytics for', state.people.length, 'people in tracker');
+                console.log('Current user ID:', currentUserId);
+                
+                // Get current user's name for comparison
+                const currentUserDoc = await window.firebaseDb.collection('users').doc(currentUserId).get();
+                let currentUserName = window.currentUser.displayName || '';
+                if (currentUserDoc.exists) {
+                    const currentUserData = currentUserDoc.data();
+                    if (currentUserData.name) {
+                        currentUserName = currentUserData.name;
+                    } else if (!currentUserName && currentUserData.email) {
+                        currentUserName = currentUserData.email.split('@')[0];
+                    }
+                }
+                console.log('Current user name for matching:', currentUserName);
                 
                 for (const person of state.people) {
                     const personName = (person.name || '').trim();
@@ -995,14 +1010,24 @@ async function deleteCurrentTable() {
                     }
                     
                     const personNameLower = personName.toLowerCase();
+                    const currentUserNameLower = currentUserName.toLowerCase();
                     console.log(`Looking for user matching: "${personName}"`);
                     
                     // Try to find matching user (exact match or partial match)
                     let matchedUser = null;
                     let matchedUserId = null;
                     
+                    // First, check if this person is the current user (table creator)
+                    // This is important because the current user might have added themselves manually
+                    if (personNameLower === currentUserNameLower || 
+                        (currentUserNameLower && personNameLower.includes(currentUserNameLower)) ||
+                        (currentUserNameLower && currentUserNameLower.includes(personNameLower))) {
+                        matchedUser = currentUserDoc.exists ? currentUserDoc.data() : {};
+                        matchedUserId = currentUserId;
+                        console.log(`✅ Matched to current user (table creator): "${personName}" -> userId=${matchedUserId}`);
+                    }
                     // Try exact match first (by name, email, or uniqueId)
-                    if (userMap.has(personNameLower)) {
+                    else if (userMap.has(personNameLower)) {
                         const match = userMap.get(personNameLower);
                         matchedUser = match.userData;
                         matchedUserId = match.userId;
