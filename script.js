@@ -956,57 +956,112 @@ async function deleteCurrentTable() {
     }
 
     if (confirm('Are you sure you want to delete this table? This cannot be undone.')) {
-        // Record analytics before deleting (if user is in the tracker)
+        // Record analytics for all users in the tracker before deleting
         if (window.firebaseDb && window.currentUser && state.people && state.people.length > 0) {
             try {
-                const userId = window.currentUser.uid;
-                const userDocRef = window.firebaseDb.collection('users').doc(userId);
-                const userDoc = await userDocRef.get();
+                const gameDate = state.trackerName ? extractDateFromTrackerName(state.trackerName) : new Date();
+                const trackerId = state.trackerId;
+                const trackerName = state.trackerName || 'Unknown Table';
                 
-                // Get user's name for matching
-                let userName = window.currentUser.displayName || '';
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    if (userData.name) {
-                        userName = userData.name;
-                    } else if (!userName && userData.email) {
-                        userName = userData.email.split('@')[0];
+                // Get all users from Firestore to match against people in tracker
+                const usersRef = window.firebaseDb.collection('users');
+                const usersSnapshot = await usersRef.get();
+                
+                // Build a map of user data for quick lookup
+                const userMap = new Map();
+                usersSnapshot.forEach(doc => {
+                    const userData = doc.data();
+                    const userId = doc.id;
+                    const name = (userData.displayName || userData.name || userData.email || '').trim().toLowerCase();
+                    const email = (userData.email || '').trim().toLowerCase();
+                    const uniqueId = (userData.uniqueId || '').trim().toLowerCase();
+                    
+                    // Store user data keyed by name, email, and uniqueId for matching
+                    if (name) userMap.set(name, { userId, userData });
+                    if (email) userMap.set(email, { userId, userData });
+                    if (uniqueId) userMap.set(uniqueId, { userId, userData });
+                });
+                
+                // Process each person in the tracker
+                const analyticsPromises = [];
+                
+                for (const person of state.people) {
+                    const personName = (person.name || '').trim().toLowerCase();
+                    if (!personName) continue; // Skip empty names
+                    
+                    // Try to find matching user (exact match or partial match)
+                    let matchedUser = null;
+                    let matchedUserId = null;
+                    
+                    // Try exact match first
+                    if (userMap.has(personName)) {
+                        const match = userMap.get(personName);
+                        matchedUser = match.userData;
+                        matchedUserId = match.userId;
+                    } else {
+                        // Try partial matching by checking all users
+                        usersSnapshot.forEach(doc => {
+                            if (matchedUser) return; // Already found a match
+                            
+                            const userData = doc.data();
+                            const userId = doc.id;
+                            const userName = (userData.displayName || userData.name || userData.email || '').trim().toLowerCase();
+                            const userEmail = (userData.email || '').trim().toLowerCase();
+                            const userUniqueId = (userData.uniqueId || '').trim().toLowerCase();
+                            
+                            // Check if person name matches user name (exact or contains)
+                            if (userName && (personName === userName || personName.includes(userName) || userName.includes(personName))) {
+                                matchedUser = userData;
+                                matchedUserId = userId;
+                            } else if (userEmail && personName === userEmail) {
+                                matchedUser = userData;
+                                matchedUserId = userId;
+                            } else if (userUniqueId && personName.includes(userUniqueId)) {
+                                matchedUser = userData;
+                                matchedUserId = userId;
+                            }
+                        });
+                    }
+                    
+                    // If we found a matching user, record analytics
+                    if (matchedUser && matchedUserId) {
+                        const finalPNL = (person.moneyReturned || 0) - (person.moneyPutIn || 0);
+                        
+                        // Get user document
+                        const userDocRef = window.firebaseDb.collection('users').doc(matchedUserId);
+                        const userDoc = await userDocRef.get();
+                        
+                        // Get existing analytics or create new array
+                        const existingData = userDoc.exists ? userDoc.data() : {};
+                        const existingAnalytics = existingData.analytics || [];
+                        
+                        // Add new game record
+                        const newGameRecord = {
+                            date: gameDate,
+                            pnl: finalPNL,
+                            trackerId: trackerId,
+                            trackerName: trackerName
+                        };
+                        
+                        existingAnalytics.push(newGameRecord);
+                        
+                        // Update user document with analytics (merge to preserve other data)
+                        analyticsPromises.push(
+                            userDocRef.set({
+                                analytics: existingAnalytics,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }, { merge: true }).then(() => {
+                                console.log(`Analytics recorded for ${person.name}:`, newGameRecord);
+                            }).catch(err => {
+                                console.error(`Error recording analytics for ${person.name}:`, err);
+                            })
+                        );
                     }
                 }
                 
-                // Find the user in the people array (match by name)
-                const userPerson = state.people.find(person => {
-                    const personName = (person.name || '').trim().toLowerCase();
-                    const searchName = userName.trim().toLowerCase();
-                    return personName === searchName || personName.includes(searchName) || searchName.includes(personName);
-                });
-                
-                // If user is found in the tracker, record analytics
-                if (userPerson) {
-                    const finalPNL = (userPerson.moneyReturned || 0) - (userPerson.moneyPutIn || 0);
-                    const gameDate = state.trackerName ? extractDateFromTrackerName(state.trackerName) : new Date();
-                    
-                    // Get existing analytics or create new array
-                    const existingData = userDoc.exists ? userDoc.data() : {};
-                    const existingAnalytics = existingData.analytics || [];
-                    
-                    // Add new game record
-                    const newGameRecord = {
-                        date: gameDate,
-                        pnl: finalPNL,
-                        trackerId: state.trackerId,
-                        trackerName: state.trackerName || 'Unknown Table'
-                    };
-                    
-                    existingAnalytics.push(newGameRecord);
-                    
-                    // Update user document with analytics (merge to preserve other data)
-                    await userDocRef.set({
-                        analytics: existingAnalytics,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true });
-                    
-                    console.log('Analytics recorded:', newGameRecord);
+                // Wait for all analytics updates to complete (but don't block deletion if they fail)
+                if (analyticsPromises.length > 0) {
+                    await Promise.allSettled(analyticsPromises);
                 }
             } catch (error) {
                 console.error('Error recording analytics:', error);
@@ -1768,12 +1823,15 @@ async function searchPersonNames(personId, searchTerm) {
 
 // Select person from search dropdown
 function selectPersonFromSearch(personId, name, uniqueId) {
+    // Mark that a selection is in progress to prevent blur handler from interfering
+    personNameSelectionInProgress[personId] = true;
+    
     const nameInput = document.getElementById(`person-name-${personId}`);
     const dropdown = document.getElementById(`person-search-dropdown-${personId}`);
     
     if (nameInput) {
         nameInput.value = name;
-        // Update state immediately before hiding dropdown
+        // Update state immediately
         const person = state.people.find(p => p.id === personId);
         if (person) {
             person.name = name;
@@ -1783,7 +1841,6 @@ function selectPersonFromSearch(personId, name, uniqueId) {
                     transaction.personName = person.name;
                 }
             });
-            saveState();
         }
     }
     
@@ -1791,18 +1848,29 @@ function selectPersonFromSearch(personId, name, uniqueId) {
         dropdown.classList.add('hidden');
     }
     
-    // Also call updatePersonName to ensure state is saved
+    // Call updatePersonName to ensure state is saved
     updatePersonName(personId, name);
+    
+    // Clear the selection flag after a short delay
+    setTimeout(() => {
+        personNameSelectionInProgress[personId] = false;
+    }, 300);
 }
 
 // Handle blur event (hide dropdown after a delay to allow click)
 function handlePersonNameBlur(personId, value) {
     setTimeout(() => {
+        // Don't update if a dropdown selection is in progress
+        if (personNameSelectionInProgress[personId]) {
+            return;
+        }
+        
         const dropdown = document.getElementById(`person-search-dropdown-${personId}`);
         if (dropdown) {
             dropdown.classList.add('hidden');
         }
-        // Only update if the input value hasn't been changed by a dropdown selection
+        
+        // Only update if the input value matches what was blurred (user typed, not selected)
         const nameInput = document.getElementById(`person-name-${personId}`);
         if (nameInput && nameInput.value === value) {
             updatePersonName(personId, value);
