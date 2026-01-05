@@ -2240,38 +2240,74 @@ function renderLog() {
 
 // Clear table (reset all data without affecting analytics)
 async function clearTable() {
+    // Don't allow clear if viewing friend's tracker
+    if (trackerViewState.isViewingFriendTracker) {
+        showAlertModal('You cannot clear a table when viewing a friend\'s tracker.');
+        return;
+    }
+    
     if (!state.trackerId) {
         showAlertModal('No table to clear.');
         return;
     }
     
-    if (confirm('Are you sure you want to clear all data from this table? This will reset all people, transactions, and chips but will NOT affect analytics.')) {
-        // Reset all state data
-        state.people = [];
-        state.transactions = [];
-        state.chipCounts = {
-            black: 0,
-            white: 0,
-            green: 0,
-            red: 0,
-            blue: 0
+    if (confirm('Are you sure you want to clear all data from this table? This will delete the tracker and reset all people, transactions, and chips but will NOT affect analytics.')) {
+        // Delete from Firestore trackers array
+        if (window.firebaseDb && window.currentUser) {
+            try {
+                const userId = window.currentUser.uid;
+                const docRef = window.firebaseDb.collection('users').doc(userId);
+                const doc = await docRef.get();
+                
+                if (doc.exists && doc.data().trackers) {
+                    const trackers = doc.data().trackers;
+                    // Remove the current tracker from the array
+                    const filteredTrackers = trackers.filter(t => t.id !== state.trackerId);
+                    
+                    await docRef.set({
+                        trackers: filteredTrackers,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    
+                    console.log('Tracker deleted from Firestore');
+                }
+            } catch (error) {
+                console.error('Error deleting tracker:', error);
+                showAlertModal('Error deleting table. Please try again.');
+                return;
+            }
+        }
+        
+        // Clear localStorage
+        localStorage.removeItem('pokerTrackerState');
+        
+        // Reset state completely
+        state = {
+            people: [],
+            stackValue: 0,
+            chipsPerStack: 0,
+            sameValue: true,
+            chipValue: 0,
+            chipValues: {
+                black: 0,
+                white: 0,
+                green: 0,
+                red: 0,
+                blue: 0
+            },
+            chipCounts: {
+                black: 0,
+                white: 0,
+                green: 0,
+                red: 0,
+                blue: 0
+            },
+            transactions: [],
+            trackerId: null,
+            trackerName: null
         };
         
-        // Reset people's data but keep tracker configuration
-        // (stackValue, chipsPerStack, sameValue, chipValue, chipValues remain)
-        
-        // Re-render UI
-        renderPeopleWidgets();
-        updateTotalPot();
-        updateTotalChips();
-        renderLog();
-        
-        // Save state (this will update the tracker in Firestore)
-        await saveState();
-        
-        console.log('Table cleared successfully');
-        
-        // Navigate back to home screen
+        // Show main screen (which will load remaining trackers)
         await showMainScreen();
     }
 }
