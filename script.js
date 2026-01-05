@@ -985,19 +985,28 @@ async function deleteCurrentTable() {
                 // Process each person in the tracker
                 const analyticsPromises = [];
                 
+                console.log('Recording analytics for', state.people.length, 'people in tracker');
+                
                 for (const person of state.people) {
-                    const personName = (person.name || '').trim().toLowerCase();
-                    if (!personName) continue; // Skip empty names
+                    const personName = (person.name || '').trim();
+                    if (!personName) {
+                        console.log('Skipping person with empty name');
+                        continue; // Skip empty names
+                    }
+                    
+                    const personNameLower = personName.toLowerCase();
+                    console.log(`Looking for user matching: "${personName}"`);
                     
                     // Try to find matching user (exact match or partial match)
                     let matchedUser = null;
                     let matchedUserId = null;
                     
-                    // Try exact match first
-                    if (userMap.has(personName)) {
-                        const match = userMap.get(personName);
+                    // Try exact match first (by name, email, or uniqueId)
+                    if (userMap.has(personNameLower)) {
+                        const match = userMap.get(personNameLower);
                         matchedUser = match.userData;
                         matchedUserId = match.userId;
+                        console.log(`Found exact match for "${personName}": userId=${matchedUserId}`);
                     } else {
                         // Try partial matching by checking all users
                         usersSnapshot.forEach(doc => {
@@ -1005,20 +1014,47 @@ async function deleteCurrentTable() {
                             
                             const userData = doc.data();
                             const userId = doc.id;
-                            const userName = (userData.displayName || userData.name || userData.email || '').trim().toLowerCase();
+                            const userName = (userData.displayName || userData.name || '').trim();
                             const userEmail = (userData.email || '').trim().toLowerCase();
                             const userUniqueId = (userData.uniqueId || '').trim().toLowerCase();
+                            const userNameLower = userName.toLowerCase();
                             
-                            // Check if person name matches user name (exact or contains)
-                            if (userName && (personName === userName || personName.includes(userName) || userName.includes(personName))) {
+                            // Check for exact match on displayName/name (case-insensitive)
+                            if (userName && personNameLower === userNameLower) {
                                 matchedUser = userData;
                                 matchedUserId = userId;
-                            } else if (userEmail && personName === userEmail) {
+                                console.log(`Found exact name match for "${personName}": userId=${matchedUserId}, userName="${userName}"`);
+                            }
+                            // Check for email match
+                            else if (userEmail && personNameLower === userEmail) {
                                 matchedUser = userData;
                                 matchedUserId = userId;
-                            } else if (userUniqueId && personName.includes(userUniqueId)) {
+                                console.log(`Found email match for "${personName}": userId=${matchedUserId}`);
+                            }
+                            // Check if person name contains uniqueId or vice versa
+                            else if (userUniqueId && (personNameLower.includes(userUniqueId) || personNameLower === userUniqueId)) {
                                 matchedUser = userData;
                                 matchedUserId = userId;
+                                console.log(`Found uniqueId match for "${personName}": userId=${matchedUserId}, uniqueId=${userUniqueId}`);
+                            }
+                            // Check if person name is contained in or contains user name (but only if names are reasonably similar)
+                            else if (userName && userNameLower.length > 0) {
+                                // Check if one contains the other (but avoid false positives)
+                                const nameParts = userNameLower.split(/\s+/);
+                                const personParts = personNameLower.split(/\s+/);
+                                
+                                // If all parts of one name are in the other, consider it a match
+                                const allPartsMatch = nameParts.length > 0 && nameParts.every(part => 
+                                    part.length > 2 && personNameLower.includes(part)
+                                ) || personParts.length > 0 && personParts.every(part => 
+                                    part.length > 2 && userNameLower.includes(part)
+                                );
+                                
+                                if (allPartsMatch) {
+                                    matchedUser = userData;
+                                    matchedUserId = userId;
+                                    console.log(`Found partial name match for "${personName}": userId=${matchedUserId}, userName="${userName}"`);
+                                }
                             }
                         });
                     }
@@ -1051,11 +1087,13 @@ async function deleteCurrentTable() {
                                 analytics: existingAnalytics,
                                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                             }, { merge: true }).then(() => {
-                                console.log(`Analytics recorded for ${person.name}:`, newGameRecord);
+                                console.log(`✅ Analytics recorded for "${person.name}" (userId: ${matchedUserId}):`, newGameRecord);
                             }).catch(err => {
-                                console.error(`Error recording analytics for ${person.name}:`, err);
+                                console.error(`❌ Error recording analytics for "${person.name}":`, err);
                             })
                         );
+                    } else {
+                        console.log(`⚠️ No user match found for "${personName}" - skipping analytics`);
                     }
                 }
                 
