@@ -2047,6 +2047,8 @@ h3 {
     padding: 15px;
     border-bottom: 1px solid #dee2e6;
     transition: background 0.2s;
+    position: relative;
+    gap: 10px;
 }
 
 .analytics-history-item:last-child {
@@ -2060,20 +2062,28 @@ h3 {
 .history-item-date {
     font-weight: 500;
     color: #333;
-    min-width: 120px;
+    min-width: 90px;
+    flex-shrink: 0;
+    font-size: 0.9em;
 }
 
 .history-item-name {
     flex: 1;
-    margin: 0 20px;
+    margin: 0 10px;
     color: #666;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .history-item-pnl {
     font-weight: 700;
-    font-size: 1.1em;
-    min-width: 100px;
+    font-size: 1em;
+    min-width: 80px;
     text-align: right;
+    margin-right: 10px;
+    flex-shrink: 0;
 }
 
 .history-item-pnl.pnl-positive {
@@ -2082,4 +2092,99 @@ h3 {
 
 .history-item-pnl.pnl-negative {
     color: #dc3545;
+}
+
+.history-item-delete {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.history-item-delete:hover {
+    background: #c82333;
+}
+
+/* Mobile responsive styles for analytics history */
+@media (max-width: 768px) {
+    .analytics-history-item {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 12px 40px 12px 12px;
+        gap: 8px;
+        position: relative;
+    }
+    
+    .history-item-date {
+        min-width: auto;
+        width: 100%;
+        font-size: 0.85em;
+        color: #666;
+        order: 1;
+    }
+    
+    .history-item-name {
+        width: 100%;
+        margin: 0;
+        font-size: 0.95em;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        order: 2;
+    }
+    
+    .history-item-pnl {
+        width: 100%;
+        text-align: left;
+        margin-right: 0;
+        font-size: 1.1em;
+        min-width: auto;
+        order: 3;
+    }
+    
+    .history-item-delete {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 28px;
+        height: 28px;
+        font-size: 18px;
+    }
+    
+    .analytics-history-list {
+        padding: 15px;
+    }
+}
+
+.history-item-delete {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.history-item-delete:hover {
+    background: #c82333;
 }
