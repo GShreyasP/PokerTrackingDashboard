@@ -1698,6 +1698,7 @@ function submitSubtract(personId) {
 // Update person name
 // Search for person names and show dropdown
 let personSearchTimeout = {};
+let personNameSelectionInProgress = {}; // Track when a dropdown selection is in progress
 async function searchPersonNames(personId, searchTerm) {
     // Clear any existing timeout
     if (personSearchTimeout[personId]) {
