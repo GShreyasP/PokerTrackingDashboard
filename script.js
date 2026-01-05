@@ -1772,12 +1772,26 @@ function selectPersonFromSearch(personId, name, uniqueId) {
     
     if (nameInput) {
         nameInput.value = name;
-        updatePersonName(personId, name);
+        // Update state immediately before hiding dropdown
+        const person = state.people.find(p => p.id === personId);
+        if (person) {
+            person.name = name;
+            // Update transaction log entries with new name
+            state.transactions.forEach(transaction => {
+                if (transaction.personId === personId) {
+                    transaction.personName = person.name;
+                }
+            });
+            saveState();
+        }
     }
     
     if (dropdown) {
         dropdown.classList.add('hidden');
     }
+    
+    // Also call updatePersonName to ensure state is saved
+    updatePersonName(personId, name);
 }
 
 // Handle blur event (hide dropdown after a delay to allow click)
@@ -1787,7 +1801,11 @@ function handlePersonNameBlur(personId, value) {
         if (dropdown) {
             dropdown.classList.add('hidden');
         }
-        updatePersonName(personId, value);
+        // Only update if the input value hasn't been changed by a dropdown selection
+        const nameInput = document.getElementById(`person-name-${personId}`);
+        if (nameInput && nameInput.value === value) {
+            updatePersonName(personId, value);
+        }
     }, 200);
 }
 
