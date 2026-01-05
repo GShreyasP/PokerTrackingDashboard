@@ -2270,6 +2270,9 @@ async function clearTable() {
         await saveState();
         
         console.log('Table cleared successfully');
+        
+        // Navigate back to home screen
+        await showMainScreen();
     }
 }
 
