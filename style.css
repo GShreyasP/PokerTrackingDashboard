@@ -2116,6 +2116,28 @@ h3 {
     background: #c82333;
 }
 
+/* Clear Table Button */
+.btn-clear-table {
+    background: #ff9800;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-top: 20px;
+    width: 100%;
+    max-width: 300px;
+}
+
+.btn-clear-table:hover {
+    background: #f57c00;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
+}
+
 /* Mobile responsive styles for analytics history */
 @media (max-width: 768px) {
     .analytics-history-item {

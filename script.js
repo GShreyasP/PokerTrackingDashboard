@@ -1885,7 +1885,7 @@ async function searchPersonNames(personId, searchTerm) {
 }
 
 // Select person from search dropdown
-function selectPersonFromSearch(personId, name, uniqueId) {
+async function selectPersonFromSearch(personId, name, uniqueId) {
     // Mark that a selection is in progress to prevent blur handler from interfering
     personNameSelectionInProgress[personId] = true;
     
@@ -1913,6 +1913,69 @@ function selectPersonFromSearch(personId, name, uniqueId) {
     
     // Call updatePersonName to ensure state is saved
     updatePersonName(personId, name);
+    
+    // If a user was selected (not just a name typed), add tracker to their "Your Tables"
+    // Find the user by name or uniqueId and add this tracker to their trackers list
+    if (window.firebaseDb && window.currentUser && state.trackerId && (name || uniqueId)) {
+        try {
+            // Search for the user by name or uniqueId
+            const usersRef = window.firebaseDb.collection('users');
+            const snapshot = await usersRef.get();
+            
+            let selectedUserId = null;
+            snapshot.forEach(doc => {
+                if (selectedUserId) return; // Already found
+                
+                const userData = doc.data();
+                const userId = doc.id;
+                const userName = (userData.displayName || userData.name || '').trim();
+                const userUniqueId = (userData.uniqueId || '').trim();
+                
+                // Match by name or uniqueId
+                if (uniqueId && userUniqueId && userUniqueId.toLowerCase() === uniqueId.toLowerCase()) {
+                    selectedUserId = userId;
+                } else if (name && userName && userName.toLowerCase() === name.toLowerCase()) {
+                    selectedUserId = userId;
+                }
+            });
+            
+            // If we found the user and they're not the current user, add tracker to their list
+            if (selectedUserId && selectedUserId !== window.currentUser.uid) {
+                const selectedUserRef = window.firebaseDb.collection('users').doc(selectedUserId);
+                const selectedUserDoc = await selectedUserRef.get();
+                
+                let selectedUserTrackers = [];
+                if (selectedUserDoc.exists && selectedUserDoc.data().trackers) {
+                    selectedUserTrackers = selectedUserDoc.data().trackers;
+                }
+                
+                // Check if tracker already exists in their list
+                const trackerExists = selectedUserTrackers.some(t => t.id === state.trackerId);
+                
+                if (!trackerExists) {
+                    // Add tracker to selected user's trackers list
+                    const trackerData = {
+                        id: state.trackerId,
+                        name: state.trackerName || `Table ${new Date().toLocaleDateString()}`,
+                        state: prepareStateForFirestore(state),
+                        updatedAt: new Date().toISOString()
+                    };
+                    
+                    selectedUserTrackers.push(trackerData);
+                    
+                    await selectedUserRef.set({
+                        trackers: selectedUserTrackers,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    
+                    console.log(`Added tracker to ${name}'s "Your Tables" section`);
+                }
+            }
+        } catch (error) {
+            console.error('Error adding tracker to selected user:', error);
+            // Don't block the name update if this fails
+        }
+    }
     
     // Clear the selection flag after a short delay
     setTimeout(() => {
@@ -2173,6 +2236,49 @@ function renderLog() {
         
         logEntriesDiv.appendChild(logEntry);
     });
+    
+    // Add Clear Table button after transaction log entries
+    const clearTableBtn = document.createElement('button');
+    clearTableBtn.id = 'clear-table-btn';
+    clearTableBtn.className = 'btn btn-clear-table';
+    clearTableBtn.textContent = 'Clear Table';
+    clearTableBtn.onclick = clearTable;
+    logEntriesDiv.appendChild(clearTableBtn);
+}
+
+// Clear table (reset all data without affecting analytics)
+async function clearTable() {
+    if (!state.trackerId) {
+        showAlertModal('No table to clear.');
+        return;
+    }
+    
+    if (confirm('Are you sure you want to clear all data from this table? This will reset all people, transactions, and chips but will NOT affect analytics.')) {
+        // Reset all state data
+        state.people = [];
+        state.transactions = [];
+        state.chipCounts = {
+            black: 0,
+            white: 0,
+            green: 0,
+            red: 0,
+            blue: 0
+        };
+        
+        // Reset people's data but keep tracker configuration
+        // (stackValue, chipsPerStack, sameValue, chipValue, chipValues remain)
+        
+        // Re-render UI
+        renderPeopleWidgets();
+        updateTotalPot();
+        updateTotalChips();
+        renderLog();
+        
+        // Save state (this will update the tracker in Firestore)
+        await saveState();
+        
+        console.log('Table cleared successfully');
+    }
 }
 
 // Settlement functions
@@ -4762,6 +4868,8 @@ async function deleteAnalyticsEntry(gameIdentifier) {
 
 window.showAnalyticsPage = showAnalyticsPage;
 window.deleteAnalyticsEntry = deleteAnalyticsEntry;
+window.clearTable = clearTable;
+window.selectPersonFromSearch = selectPersonFromSearch;
 window.deleteAnalyticsEntry = deleteAnalyticsEntry;
 
 // Install Instructions Modal Functions
