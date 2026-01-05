@@ -4701,6 +4701,7 @@ function displayAnalytics(analytics) {
 }
 
 window.showAnalyticsPage = showAnalyticsPage;
+window.deleteAnalyticsEntry = deleteAnalyticsEntry;
 
 // Install Instructions Modal Functions
 function showInstallInstructions() {
