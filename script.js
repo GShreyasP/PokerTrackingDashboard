@@ -4357,9 +4357,20 @@ async function loadUserTracker(trackerId) {
             backToHomeBtn.classList.remove('hidden');
         }
         
-        if (mainScreen) mainScreen.classList.add('hidden');
-        if (setupSection) setupSection.classList.add('hidden');
-        if (trackingSection) trackingSection.classList.remove('hidden');
+        // Hide main screen and setup section with inline styles for robustness
+        if (mainScreen) {
+            mainScreen.classList.add('hidden');
+            mainScreen.style.display = 'none';
+        }
+        if (setupSection) {
+            setupSection.classList.add('hidden');
+            setupSection.style.display = 'none';
+        }
+        // Show tracking section with inline style to ensure visibility
+        if (trackingSection) {
+            trackingSection.classList.remove('hidden');
+            trackingSection.style.display = '';
+        }
         
         // Render widgets and update display
         renderPeopleWidgets();
