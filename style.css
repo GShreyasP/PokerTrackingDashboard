@@ -1425,8 +1425,8 @@ h3 {
     border-radius: 10px;
     font-size: 1.2em;
     font-weight: 600;
-    color: #f8fafc;
-    background: rgba(15, 23, 42, 0.7);
+    color: #1e293b;
+    background: #ffffff;
     text-align: center;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -1435,10 +1435,15 @@ h3 {
 .widget-name-input:focus {
     outline: none;
     border-color: #6366f1;
-    background: rgba(15, 23, 42, 0.9);
+    background: #ffffff;
+    color: #1e293b;
     box-shadow: 
         0 0 0 3px rgba(99, 102, 241, 0.1),
         0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.widget-name-input::placeholder {
+    color: #64748b;
 }
 
 .name-input-wrapper {
