@@ -2563,9 +2563,141 @@ function showInvitePeopleModal() {
     }, 300);
 }
 
-// Show settings modal (placeholder for now)
+// Show settings page
+async function showSettingsPage() {
+    const mainScreen = document.getElementById('main-screen');
+    const settingsPage = document.getElementById('settings-page');
+    const setupSection = document.getElementById('setup-section');
+    const trackingSection = document.getElementById('tracking-section');
+    const analyticsPage = document.getElementById('analytics-page');
+    
+    if (mainScreen) mainScreen.classList.add('hidden');
+    if (setupSection) setupSection.classList.add('hidden');
+    if (trackingSection) trackingSection.classList.add('hidden');
+    if (analyticsPage) analyticsPage.classList.add('hidden');
+    
+    if (settingsPage) {
+        settingsPage.classList.remove('hidden');
+        await loadSettingsData();
+    }
+}
+
+// Load current user data into settings inputs
+async function loadSettingsData() {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    try {
+        const userId = window.currentUser.uid;
+        const userDocRef = window.firebaseDb.collection('users').doc(userId);
+        const userDoc = await userDocRef.get();
+        
+        const usernameInput = document.getElementById('settings-username');
+        const uniqueIdInput = document.getElementById('settings-unique-id');
+        
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            
+            // Load username (displayName)
+            if (usernameInput) {
+                usernameInput.value = userData.displayName || window.currentUser.displayName || window.currentUser.email || '';
+            }
+            
+            // Load unique ID
+            if (uniqueIdInput) {
+                uniqueIdInput.value = userData.uniqueId || '';
+            }
+        } else {
+            // If no user doc exists, use auth data
+            if (usernameInput) {
+                usernameInput.value = window.currentUser.displayName || window.currentUser.email || '';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading settings data:', error);
+    }
+}
+
+// Save username (auto-save on blur)
+async function saveUsername(newUsername) {
+    if (!window.firebaseDb || !window.currentUser || !newUsername || newUsername.trim() === '') {
+        // If empty, restore original value
+        await loadSettingsData();
+        return;
+    }
+    
+    const trimmedUsername = newUsername.trim();
+    const userId = window.currentUser.uid;
+    
+    try {
+        // Update Firestore user document
+        const userDocRef = window.firebaseDb.collection('users').doc(userId);
+        await userDocRef.set({
+            displayName: trimmedUsername,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        
+        // Update Firebase Auth displayName
+        if (window.firebaseAuth && window.currentUser) {
+            await window.currentUser.updateProfile({
+                displayName: trimmedUsername
+            });
+        }
+        
+        // Update header display
+        const headerUserName = document.getElementById('header-user-name');
+        if (headerUserName) {
+            headerUserName.textContent = trimmedUsername;
+        }
+        
+        console.log('Username saved:', trimmedUsername);
+    } catch (error) {
+        console.error('Error saving username:', error);
+        showAlertModal('Error saving username. Please try again.');
+        // Restore original value on error
+        await loadSettingsData();
+    }
+}
+
+// Save unique ID (auto-save on blur)
+async function saveUniqueId(newUniqueId) {
+    if (!window.firebaseDb || !window.currentUser) return;
+    
+    const trimmedUniqueId = newUniqueId ? newUniqueId.trim() : '';
+    const userId = window.currentUser.uid;
+    
+    try {
+        // If empty, don't save
+        if (trimmedUniqueId === '') {
+            // Restore original value
+            await loadSettingsData();
+            return;
+        }
+        
+        // Update Firestore user document
+        const userDocRef = window.firebaseDb.collection('users').doc(userId);
+        await userDocRef.set({
+            uniqueId: trimmedUniqueId,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        
+        // Update header display
+        const headerUserId = document.getElementById('header-user-id');
+        if (headerUserId) {
+            headerUserId.textContent = `ID: ${trimmedUniqueId}`;
+        }
+        
+        console.log('Unique ID saved:', trimmedUniqueId);
+    } catch (error) {
+        console.error('Error saving unique ID:', error);
+        showAlertModal('Error saving unique ID. Please try again.');
+        // Restore original value on error
+        await loadSettingsData();
+    }
+}
+
+// Show settings modal (for backward compatibility, now shows settings page)
 function showSettingsModal() {
-    showAlertModal('Settings coming soon!');
+    showSettingsPage();
 }
 
 function toggleFriendsSidebar() {
@@ -4933,6 +5065,10 @@ window.toggleFriendsSidebar = toggleFriendsSidebar;
 window.toggleSidebarMenu = toggleSidebarMenu;
 window.showInvitePeopleModal = showInvitePeopleModal;
 window.showSettingsModal = showSettingsModal;
+window.showSettingsPage = showSettingsPage;
+window.loadSettingsData = loadSettingsData;
+window.saveUsername = saveUsername;
+window.saveUniqueId = saveUniqueId;
 window.searchFriend = searchFriend;
 window.sendFriendRequest = sendFriendRequest;
 window.acceptFriendRequest = acceptFriendRequest;

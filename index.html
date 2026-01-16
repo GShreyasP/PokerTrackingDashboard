@@ -240,6 +240,30 @@
             </div>
         </div>
         
+        <!-- Settings Page -->
+        <div id="settings-page" class="settings-page hidden">
+            <div class="settings-content">
+                <div class="settings-header">
+                    <h2>Settings</h2>
+                </div>
+                <div class="settings-section">
+                    <div class="settings-item">
+                        <label for="settings-username" class="settings-label">Username</label>
+                        <p class="settings-description">Change your display name</p>
+                        <input type="text" id="settings-username" class="settings-input" placeholder="Enter your username" onblur="saveUsername(this.value)">
+                    </div>
+                    <div class="settings-item">
+                        <label for="settings-unique-id" class="settings-label">Unique ID (Zelle/Venmo)</label>
+                        <p class="settings-description">Your unique identifier for Zelle or Venmo payments</p>
+                        <input type="text" id="settings-unique-id" class="settings-input" placeholder="Enter your Zelle/Venmo ID" onblur="saveUniqueId(this.value)">
+                    </div>
+                </div>
+                <div class="settings-footer">
+                    <button class="btn btn-secondary" onclick="showMainScreen()">Back to Home</button>
+                </div>
+            </div>
+        </div>
+        
         <!-- Analytics Page -->
         <div id="analytics-page" class="analytics-page hidden">
             <div class="analytics-content">
