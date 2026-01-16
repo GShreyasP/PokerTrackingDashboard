@@ -341,6 +341,15 @@ h1 span {
     stroke: currentColor;
     fill: none;
     display: block;
+    flex-shrink: 0;
+}
+
+.btn-notifications svg.notification-icon {
+    width: 20px !important;
+    height: 20px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 /* New Table Button */
