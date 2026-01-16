@@ -307,6 +307,72 @@ h1 span {
     font-weight: 400;
 }
 
+/* Notifications Button */
+.btn-notifications {
+    background: rgba(51, 65, 85, 0.5);
+    border: 1px solid rgba(71, 85, 105, 0.5);
+    color: #cbd5e1;
+    padding: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    box-sizing: border-box;
+}
+
+.btn-notifications:hover {
+    background: rgba(51, 65, 85, 0.8);
+    border-color: rgba(71, 85, 105, 0.8);
+    color: #f8fafc;
+    transform: translateY(-1px);
+}
+
+.btn-notifications .notification-icon {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+}
+
+/* New Table Button */
+.btn-new-table {
+    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+    color: #ffffff;
+    border: none;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 44px;
+    box-sizing: border-box;
+}
+
+.btn-new-table:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(59, 130, 246, 0.4);
+}
+
+.btn-new-table .plus-icon {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 2.5;
+}
+
 .btn-sign-out {
     background: #7f1d1d;
     color: #ef4444;

@@ -2627,34 +2627,76 @@ function closeFriendsSidebar() {
     }
 }
 
-// Show friends button when authenticated
+// Show friends button when authenticated (deprecated - kept for compatibility)
 function showFriendsButton() {
-    const friendsBtn = document.getElementById('friends-btn');
-    const authPage = document.getElementById('auth-page');
-    
-    // Only show friends button if authenticated and not on auth page
-    if (friendsBtn && window.currentUser && authPage && authPage.classList.contains('hidden')) {
-        friendsBtn.classList.remove('hidden');
-        friendsBtn.style.display = ''; // Remove inline style
-    } else if (friendsBtn) {
-        friendsBtn.classList.add('hidden');
-        friendsBtn.style.display = 'none'; // Force hide with inline style
-    }
-    
+    // Friends button is now in sidebar menu, but keep this for compatibility
     // Show/hide hamburger menu button
     showHamburgerButton();
+    
+    // Show notifications and new table buttons
+    showNotificationsButton();
+    showNewTableButton();
 }
 
-// Hide friends button when signed out
+// Hide friends button when signed out (deprecated - kept for compatibility)
 function hideFriendsButton() {
-    const friendsBtn = document.getElementById('friends-btn');
-    if (friendsBtn) {
-        friendsBtn.classList.add('hidden');
-        friendsBtn.style.display = 'none'; // Force hide with inline style
-    }
-    
     // Hide hamburger menu button
     hideHamburgerButton();
+    
+    // Hide notifications and new table buttons
+    hideNotificationsButton();
+    hideNewTableButton();
+}
+
+// Show notifications button when authenticated
+function showNotificationsButton() {
+    const notificationsBtn = document.getElementById('notifications-btn');
+    const authPage = document.getElementById('auth-page');
+    
+    if (notificationsBtn && window.currentUser && authPage && authPage.classList.contains('hidden')) {
+        notificationsBtn.classList.remove('hidden');
+        notificationsBtn.style.display = 'flex';
+    } else if (notificationsBtn) {
+        notificationsBtn.classList.add('hidden');
+        notificationsBtn.style.display = 'none';
+    }
+}
+
+// Hide notifications button when signed out
+function hideNotificationsButton() {
+    const notificationsBtn = document.getElementById('notifications-btn');
+    if (notificationsBtn) {
+        notificationsBtn.classList.add('hidden');
+        notificationsBtn.style.display = 'none';
+    }
+}
+
+// Show new table button when authenticated
+function showNewTableButton() {
+    const newTableBtn = document.getElementById('new-table-btn');
+    const authPage = document.getElementById('auth-page');
+    
+    if (newTableBtn && window.currentUser && authPage && authPage.classList.contains('hidden')) {
+        newTableBtn.classList.remove('hidden');
+        newTableBtn.style.display = 'flex';
+    } else if (newTableBtn) {
+        newTableBtn.classList.add('hidden');
+        newTableBtn.style.display = 'none';
+    }
+}
+
+// Hide new table button when signed out
+function hideNewTableButton() {
+    const newTableBtn = document.getElementById('new-table-btn');
+    if (newTableBtn) {
+        newTableBtn.classList.add('hidden');
+        newTableBtn.style.display = 'none';
+    }
+}
+
+// Toggle notifications sidebar (shows friends sidebar for now since notifications are there)
+function toggleNotificationsSidebar() {
+    toggleFriendsSidebar();
 }
 
 // Show hamburger menu button when authenticated
@@ -2939,15 +2981,20 @@ async function loadFriendRequests() {
 
 // Update friends notification badge
 function updateFriendsNotificationBadge(count) {
-    const badge = document.getElementById('friends-notification-badge');
-    if (!badge) return;
+    // Update both the old friends badge (if it exists) and the new notifications badge
+    const friendsBadge = document.getElementById('friends-notification-badge');
+    const notificationsBadge = document.getElementById('notifications-badge');
     
-    if (count > 0) {
-        badge.textContent = count > 99 ? '99+' : count;
-        badge.classList.remove('hidden');
-    } else {
-        badge.classList.add('hidden');
-    }
+    const badges = [friendsBadge, notificationsBadge].filter(Boolean);
+    
+    badges.forEach(badge => {
+        if (count > 0) {
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    });
 }
 
 // Check for all notifications (friend requests, join requests, edit requests)
@@ -4892,6 +4939,11 @@ window.showFriendsButton = showFriendsButton;
 window.hideFriendsButton = hideFriendsButton;
 window.showHamburgerButton = showHamburgerButton;
 window.hideHamburgerButton = hideHamburgerButton;
+window.showNotificationsButton = showNotificationsButton;
+window.hideNotificationsButton = hideNotificationsButton;
+window.showNewTableButton = showNewTableButton;
+window.hideNewTableButton = hideNewTableButton;
+window.toggleNotificationsSidebar = toggleNotificationsSidebar;
 window.checkFriendRequestNotifications = checkFriendRequestNotifications;
 window.updateAllNotifications = updateAllNotifications;
 window.loadState = loadState; // Make available for firebase-init.js
