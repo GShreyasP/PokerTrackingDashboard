@@ -663,13 +663,7 @@ h3 {
     font-weight: 500;
 }
 
-.your-tables-section {
-    margin-top: 0;
-}
-
-.live-tables-section {
-    margin-top: 0;
-}
+/* Section styles now handled by .section-title and .tables-grid */
 
 .live-table-widget,
 .table-card {
