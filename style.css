@@ -656,11 +656,51 @@ h3 {
 
 /* Setup Section */
 .setup-section {
-    background: white;
-    border-radius: 15px;
-    padding: 30px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: 24px;
+    padding: 40px;
+    box-shadow: 
+        0 20px 60px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.05) inset;
     margin-bottom: 20px;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+    position: relative;
+    overflow: hidden;
+}
+
+.setup-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(99, 102, 241, 0.5) 50%, 
+        transparent 100%);
+    opacity: 0.6;
+}
+
+.setup-section h2 {
+    color: #f8fafc;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 32px;
+}
+
+.setup-section h3 {
+    color: #e2e8f0;
+    font-size: 18px;
+    font-weight: 600;
+    margin-top: 24px;
+    margin-bottom: 16px;
 }
 
 .setup-section.hidden {
@@ -682,38 +722,47 @@ h3 {
 .form-group label {
     display: block;
     margin-bottom: 8px;
-    font-weight: 600;
-    color: #555;
+    font-weight: 500;
+    color: #e2e8f0;
+    font-size: 14px;
 }
 
 .form-group input[type="number"],
 .form-group input[type="text"] {
     width: 100%;
-    padding: 12px;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
-    font-size: 16px;
-    transition: border-color 0.3s;
+    padding: 14px 16px;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 10px;
+    font-size: 15px;
+    color: #f8fafc;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .form-group input[type="number"]::placeholder,
 .form-group input[type="text"]::placeholder {
-    color: #999;
+    color: #64748b;
     opacity: 1;
 }
 
 .form-group input[type="number"]:focus,
 .form-group input[type="text"]:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: #6366f1;
+    background: rgba(15, 23, 42, 0.9);
+    box-shadow: 
+        0 0 0 3px rgba(99, 102, 241, 0.1),
+        0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .toggle-label {
     display: flex;
     align-items: center;
     cursor: pointer;
-    font-weight: 600;
-    color: #555;
+    font-weight: 500;
+    color: #e2e8f0;
+    font-size: 14px;
 }
 
 .toggle-label input[type="checkbox"] {
@@ -721,6 +770,10 @@ h3 {
     height: 20px;
     margin-right: 10px;
     cursor: pointer;
+    accent-color: #6366f1;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 4px;
 }
 
 .person-input {
