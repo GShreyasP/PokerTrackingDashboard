@@ -883,8 +883,6 @@ h3 {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
-    transform: translateY(-2px);
-}
 
 .hidden {
     display: none;
@@ -1417,9 +1415,10 @@ h3 {
 
 .log-empty {
     text-align: center;
-    color: #999;
+    color: #94a3b8;
     padding: 40px;
     font-style: italic;
+    font-size: 15px;
 }
 
 .chip-total-tracker {
