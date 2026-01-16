@@ -483,6 +483,12 @@ async function showMainScreen() {
     const analyticsPage = document.getElementById('analytics-page');
     const backToHomeBtn = document.getElementById('back-to-main-btn');
     
+    // IMPORTANT: Always hide setup section first when showing main screen
+    if (setupSection) {
+        setupSection.classList.add('hidden');
+        setupSection.style.display = 'none'; // Force hide with inline style
+    }
+    
     // Hide auth page and analytics page if visible
     if (authPage) authPage.classList.add('hidden');
     if (analyticsPage) analyticsPage.classList.add('hidden');
@@ -495,8 +501,16 @@ async function showMainScreen() {
             loadLiveTables();
         }
     }
-    if (setupSection) setupSection.classList.add('hidden');
-    if (trackingSection) trackingSection.classList.add('hidden');
+    
+    // Double-check setup section is hidden
+    if (setupSection) {
+        setupSection.classList.add('hidden');
+        setupSection.style.display = 'none';
+    }
+    
+    if (trackingSection) {
+        trackingSection.classList.add('hidden');
+    }
     
     // Hide back to home button when on main screen (you're already home!)
     if (backToHomeBtn) {
@@ -554,9 +568,18 @@ async function showSetupSection() {
     const trackingSection = document.getElementById('tracking-section');
     const backToHomeBtn = document.getElementById('back-to-main-btn');
     
-    if (mainScreen) mainScreen.classList.add('hidden');
-    if (setupSection) setupSection.classList.remove('hidden');
-    if (trackingSection) trackingSection.classList.add('hidden');
+    if (mainScreen) {
+        mainScreen.classList.add('hidden');
+        mainScreen.style.display = 'none'; // Force hide
+    }
+    if (setupSection) {
+        setupSection.classList.remove('hidden');
+        setupSection.style.display = ''; // Show setup section
+    }
+    if (trackingSection) {
+        trackingSection.classList.add('hidden');
+        trackingSection.style.display = 'none';
+    }
     
     // Show back to home button when in setup (if authenticated)
     if (backToHomeBtn) {

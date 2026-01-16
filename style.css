@@ -663,6 +663,10 @@ h3 {
     margin-bottom: 20px;
 }
 
+.setup-section.hidden {
+    display: none !important;
+}
+
 .setup-actions {
     display: flex;
     justify-content: flex-start;

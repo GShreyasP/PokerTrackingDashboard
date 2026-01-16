@@ -134,8 +134,14 @@ function showAuthPage() {
     const installAppBtn = document.getElementById('install-app-btn');
     
     if (authPage) authPage.classList.remove('hidden');
-    if (setupSection) setupSection.classList.add('hidden');
-    if (trackingSection) trackingSection.classList.add('hidden');
+    if (setupSection) {
+        setupSection.classList.add('hidden');
+        setupSection.style.display = 'none'; // Force hide with inline style
+    }
+    if (trackingSection) {
+        trackingSection.classList.add('hidden');
+        trackingSection.style.display = 'none';
+    }
     if (mainScreen) mainScreen.classList.add('hidden');
     if (headerUserInfo) headerUserInfo.classList.add('hidden');
     
@@ -219,17 +225,8 @@ async function showAuthenticatedView(user) {
     }
     
     // Setup section and tracking section visibility will be handled by loadUserData
-    // But show setup section as default if loadUserData hasn't run yet
-    setTimeout(() => {
-        const setupSection = document.getElementById('setup-section');
-        const trackingSection = document.getElementById('tracking-section');
-        // If neither is visible, show setup section
-        if (setupSection && trackingSection) {
-            if (setupSection.classList.contains('hidden') && trackingSection.classList.contains('hidden')) {
-                setupSection.classList.remove('hidden');
-            }
-        }
-    }, 500);
+    // DO NOT automatically show setup section - let loadUserData decide what to show
+    // This prevents the setup section from glitching and appearing on the home screen
 }
 
 // Ensure Friends button is hidden on initial page load (before Firebase initializes)
