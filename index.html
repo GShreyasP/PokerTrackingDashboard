@@ -125,29 +125,127 @@
         <!-- Main Screen (shown when authenticated but no tracker) -->
         <div id="main-screen" class="main-screen hidden">
             <div class="main-screen-content">
-                <div class="action-buttons">
-                    <button id="create-tracker-btn" class="btn btn-primary btn-create-tracker" onclick="showSetupSection()">
+                <!-- Stats Overview -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-label">Total Tables</div>
+                            <div class="stat-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="stat-value" id="stat-total-tables">0</div>
+                        <div class="stat-change">
+                            <span id="stat-total-tables-text">Create your first table</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-label">Active Sessions</div>
+                            <div class="stat-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M12 6v6l4 2"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="stat-value" id="stat-active-sessions">0</div>
+                        <div class="stat-change">
+                            <span id="stat-active-sessions-text">Live tables available</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-label">Total Winnings</div>
+                            <div class="stat-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2">
+                                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="stat-value" id="stat-total-winnings">$0</div>
+                        <div class="stat-change">
+                            <span id="stat-total-winnings-text">Start tracking your games</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-label">Win Rate</div>
+                            <div class="stat-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2">
+                                    <path d="M3 3v18h18"/>
+                                    <path d="M7 12l4-4 4 4 6-6"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="stat-value" id="stat-win-rate">-%</div>
+                        <div class="stat-change">
+                            <span id="stat-win-rate-text">No data yet</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-section">
+                    <button id="create-tracker-btn" class="btn-action btn-primary" onclick="showSetupSection()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14M5 12h14"/>
+                        </svg>
                         Create Your Own Table
                     </button>
-                    <button id="analytics-btn" class="btn btn-secondary btn-analytics" onclick="showAnalyticsPage()">
-                        Analytics
+                    <button id="analytics-btn" class="btn-action btn-secondary" onclick="showAnalyticsPage()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 3v18h18"/>
+                            <path d="M7 12l4-4 4 4 6-6"/>
+                        </svg>
+                        View Analytics
                     </button>
                 </div>
                 <div id="tracker-limit-error" class="tracker-limit-error hidden"></div>
                 
-                <div class="your-tables-section">
-                    <h2>Your Tables</h2>
-                    <div id="your-tables-container" class="live-tables-container">
-                        <p class="no-live-tables">No tables created yet</p>
+                <!-- Your Tables Section -->
+                <section class="your-tables-section" style="margin-bottom: 48px;">
+                    <div class="section-header">
+                        <div>
+                            <h2 class="section-title">Your Tables</h2>
+                            <p class="section-subtitle">Manage and track your poker games</p>
+                        </div>
+                        <div class="filter-tabs">
+                            <button class="filter-tab active" onclick="filterYourTables('all')">All</button>
+                            <button class="filter-tab" onclick="filterYourTables('active')">Active</button>
+                            <button class="filter-tab" onclick="filterYourTables('completed')">Completed</button>
+                        </div>
                     </div>
-                </div>
+                    <div id="your-tables-container" class="tables-grid">
+                        <div class="empty-state" id="your-tables-empty">
+                            <div class="empty-icon">🎲</div>
+                            <h3 class="empty-title">No tables created yet</h3>
+                            <p class="empty-description">Create your first table to start tracking your poker games and winnings</p>
+                        </div>
+                    </div>
+                </section>
                 
-                <div class="live-tables-section">
-                    <h2>Live Tables</h2>
-                    <div id="live-tables-container" class="live-tables-container">
-                        <p class="no-live-tables">No live tables available</p>
+                <!-- Live Tables Section -->
+                <section class="live-tables-section">
+                    <div class="section-header">
+                        <div>
+                            <h2 class="section-title">Live Tables</h2>
+                            <p class="section-subtitle">Join ongoing games from your friends</p>
+                        </div>
                     </div>
-                </div>
+                    <div id="live-tables-container" class="tables-grid">
+                        <div class="empty-state" id="live-tables-empty">
+                            <div class="empty-icon">🎲</div>
+                            <h3 class="empty-title">No live tables available</h3>
+                            <p class="empty-description">No friends are currently hosting active games</p>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
         

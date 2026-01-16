@@ -512,7 +512,8 @@ async function showMainScreen() {
         // Load user trackers and live tables
         if (window.firebaseDb && window.currentUser) {
             await loadUserTrackers();
-            loadLiveTables();
+            await loadLiveTables();
+            updateStats();
         }
     }
     
@@ -4261,6 +4262,7 @@ async function loadUserTrackers() {
     if (!window.firebaseDb || !window.currentUser) return;
     
     const yourTablesContainer = document.getElementById('your-tables-container');
+    const emptyState = document.getElementById('your-tables-empty');
     if (!yourTablesContainer) return;
     
     const currentUserId = window.currentUser.uid;
@@ -4270,8 +4272,10 @@ async function loadUserTrackers() {
         const doc = await docRef.get();
         
         if (!doc.exists || !doc.data().trackers || doc.data().trackers.length === 0) {
-            yourTablesContainer.innerHTML = '<p class="no-live-tables">No tables created yet</p>';
+            yourTablesContainer.innerHTML = '';
+            if (emptyState) emptyState.classList.remove('hidden');
             userTrackers = [];
+            updateStats();
             return;
         }
         
@@ -4279,33 +4283,57 @@ async function loadUserTrackers() {
         userTrackers = trackers;
         
         if (trackers.length === 0) {
-            yourTablesContainer.innerHTML = '<p class="no-live-tables">No tables created yet</p>';
+            yourTablesContainer.innerHTML = '';
+            if (emptyState) emptyState.classList.remove('hidden');
+            updateStats();
             return;
         }
         
-        // Render user's trackers
+        // Hide empty state
+        if (emptyState) emptyState.classList.add('hidden');
+        
+        // Render user's trackers with new card structure
         yourTablesContainer.innerHTML = trackers.map(tracker => {
             const trackerState = tracker.state || {};
-            const hasPeople = trackerState.people && trackerState.people.length > 0;
+            const peopleCount = trackerState.people ? trackerState.people.length : 0;
             const trackerName = tracker.name || 'Untitled Table';
             
             // Escape the tracker name to prevent XSS
             const escapedName = trackerName.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             return `
-                <div class="live-table-widget">
-                    <img src="assets/image-c90fcce1-ebd6-43e7-94b7-f3eb6415cdae.png" alt="Poker Table" class="live-table-image" onerror="this.style.display='none'">
-                    <div class="live-table-info">
-                        <input type="text" class="table-name-input-main" value="${escapedName}" data-tracker-id="${tracker.id}" onblur="updateTrackerNameMain('${tracker.id}', this.value)" onkeypress="if(event.key === 'Enter') { this.blur(); }">
-                        <div class="live-table-actions">
-                            <button class="btn btn-primary" onclick="loadUserTracker('${tracker.id}')">Open Table</button>
+                <div class="table-card">
+                    <div class="table-image-wrapper">
+                        <img src="assets/image-c90fcce1-ebd6-43e7-94b7-f3eb6415cdae.png" alt="Poker Table" class="table-image" onerror="this.style.display='none'">
+                    </div>
+                    <div class="table-info">
+                        <div class="table-header">
+                            <input type="text" class="table-name-input-main table-name" value="${escapedName}" data-tracker-id="${tracker.id}" onblur="updateTrackerNameMain('${tracker.id}', this.value)" onkeypress="if(event.key === 'Enter') { this.blur(); }">
+                        </div>
+                        <div class="table-meta">
+                            <div class="meta-item">
+                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="9" cy="7" r="4"/>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+                                </svg>
+                                ${peopleCount} Players
+                            </div>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn-table btn-join" onclick="loadUserTracker('${tracker.id}')">Open Table</button>
                         </div>
                     </div>
                 </div>
             `;
         }).join('');
+        updateStats();
     } catch (error) {
         console.error('Error loading user trackers:', error);
-        yourTablesContainer.innerHTML = '<p class="no-live-tables">Error loading your tables</p>';
+        yourTablesContainer.innerHTML = '';
+        if (emptyState) {
+            emptyState.classList.remove('hidden');
+            emptyState.querySelector('.empty-title').textContent = 'Error loading your tables';
+        }
     }
 }
 
@@ -4392,6 +4420,7 @@ async function loadLiveTables() {
     if (!window.firebaseDb || !window.currentUser || !liveTablesContainer) return;
     
     const currentUserId = window.currentUser.uid;
+    const emptyState = document.getElementById('live-tables-empty');
     
     try {
         // Get all friends
@@ -4404,7 +4433,13 @@ async function loadLiveTables() {
         snapshot2.forEach(doc => friendIds.add(doc.data().user1));
         
         if (friendIds.size === 0) {
-            liveTablesContainer.innerHTML = '<p class="no-live-tables">No friends yet. Add friends to see their live tables!</p>';
+            liveTablesContainer.innerHTML = '';
+            if (emptyState) {
+                emptyState.classList.remove('hidden');
+                emptyState.querySelector('.empty-title').textContent = 'No friends yet';
+                emptyState.querySelector('.empty-description').textContent = 'Add friends to see their live tables!';
+            }
+            updateStats();
             return;
         }
         
@@ -4419,41 +4454,76 @@ async function loadLiveTables() {
                     const friendName = userData.displayName || userData.name || userData.email || 'Unknown';
                     const hasAccess = await checkTrackerAccess(friendId);
                     
+                    // Get tracker info
+                    const trackers = userData.trackers || [];
+                    const activeTracker = trackers.find(t => t.state && t.state.people && t.state.people.length > 0);
+                    const peopleCount = activeTracker ? (activeTracker.state.people.length || 0) : 0;
+                    
                     liveTables.push({
                         friendId: friendId,
                         friendName: friendName,
-                        hasAccess: hasAccess
+                        hasAccess: hasAccess,
+                        peopleCount: peopleCount
                     });
                 }
             }
         }
         
         if (liveTables.length === 0) {
-            liveTablesContainer.innerHTML = '<p class="no-live-tables">No live tables available</p>';
+            liveTablesContainer.innerHTML = '';
+            if (emptyState) {
+                emptyState.classList.remove('hidden');
+                emptyState.querySelector('.empty-title').textContent = 'No live tables available';
+                emptyState.querySelector('.empty-description').textContent = 'No friends are currently hosting active games';
+            }
+            updateStats();
             return;
         }
         
-        // Render live table widgets
+        // Hide empty state
+        if (emptyState) emptyState.classList.add('hidden');
+        
+        // Render live table widgets with new card structure
         liveTablesContainer.innerHTML = liveTables.map(table => {
             // Escape the friend name to prevent XSS
             const escapedFriendName = table.friendName.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             const tableName = `${escapedFriendName}'s Table`;
             return `
-            <div class="live-table-widget">
-                <img src="assets/image-c90fcce1-ebd6-43e7-94b7-f3eb6415cdae.png" alt="Poker Table" class="live-table-image" onerror="this.style.display='none'">
-                <div class="live-table-info">
-                    <h3 class="live-table-name">${tableName}</h3>
-                    <div class="live-table-actions">
-                        <button class="btn btn-primary" onclick="showJoinTrackerModal('${table.friendId}', '${table.friendName.replace(/'/g, "\\'")}')">Join Table</button>
-                        <button class="btn btn-secondary" onclick="viewFriendTracker('${table.friendId}')">View Table</button>
+            <div class="table-card">
+                <div class="table-image-wrapper">
+                    <img src="assets/image-c90fcce1-ebd6-43e7-94b7-f3eb6415cdae.png" alt="Poker Table" class="table-image" onerror="this.style.display='none'">
+                    <span class="table-badge">Live</span>
+                </div>
+                <div class="table-info">
+                    <div class="table-header">
+                        <div class="table-name">${tableName}</div>
+                    </div>
+                    <div class="table-meta">
+                        <div class="meta-item">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+                            </svg>
+                            ${table.peopleCount} Players
+                        </div>
+                    </div>
+                    <div class="table-actions">
+                        <button class="btn-table btn-join" onclick="showJoinTrackerModal('${table.friendId}', '${table.friendName.replace(/'/g, "\\'")}')">Join Table</button>
+                        <button class="btn-table btn-view" onclick="viewFriendTracker('${table.friendId}')">View</button>
                     </div>
                 </div>
             </div>
         `;
         }).join('');
+        updateStats();
     } catch (error) {
         console.error('Error loading live tables:', error);
-        liveTablesContainer.innerHTML = '<p class="no-live-tables">Error loading live tables</p>';
+        liveTablesContainer.innerHTML = '';
+        if (emptyState) {
+            emptyState.classList.remove('hidden');
+            emptyState.querySelector('.empty-title').textContent = 'Error loading live tables';
+        }
     }
 }
 
@@ -4837,9 +4907,110 @@ async function updateTrackerName(trackerId, newName) {
     }
 }
 
+// Update stats on main screen
+function updateStats() {
+    if (!window.currentUser) return;
+    
+    // Update total tables
+    const totalTablesEl = document.getElementById('stat-total-tables');
+    const totalTablesTextEl = document.getElementById('stat-total-tables-text');
+    if (totalTablesEl && userTrackers) {
+        const totalTables = userTrackers.length;
+        totalTablesEl.textContent = totalTables;
+        if (totalTablesTextEl) {
+            totalTablesTextEl.textContent = totalTables === 0 ? 'Create your first table' : `${totalTables} table${totalTables !== 1 ? 's' : ''} created`;
+        }
+    }
+    
+    // Update active sessions (live tables)
+    const activeSessionsEl = document.getElementById('stat-active-sessions');
+    const activeSessionsTextEl = document.getElementById('stat-active-sessions-text');
+    if (activeSessionsEl && liveTablesContainer) {
+        const liveTables = liveTablesContainer.querySelectorAll('.table-card').length;
+        activeSessionsEl.textContent = liveTables;
+        if (activeSessionsTextEl) {
+            activeSessionsTextEl.textContent = liveTables === 0 ? 'No live tables' : `${liveTables} live table${liveTables !== 1 ? 's' : ''} available`;
+        }
+    }
+    
+    // Update total winnings (from analytics)
+    const totalWinningsEl = document.getElementById('stat-total-winnings');
+    const totalWinningsTextEl = document.getElementById('stat-total-winnings-text');
+    if (totalWinningsEl && window.firebaseDb && window.currentUser) {
+        // Load analytics to calculate total winnings
+        const userId = window.currentUser.uid;
+        window.firebaseDb.collection('users').doc(userId).get().then(doc => {
+            if (doc.exists) {
+                const analytics = doc.data().analytics || [];
+                const totalPNL = analytics.reduce((sum, game) => sum + (game.pnl || 0), 0);
+                if (totalWinningsEl) {
+                    totalWinningsEl.textContent = `$${totalPNL.toFixed(2)}`;
+                    if (totalPNL > 0) {
+                        totalWinningsEl.style.color = '#86efac';
+                    } else if (totalPNL < 0) {
+                        totalWinningsEl.style.color = '#fca5a5';
+                    } else {
+                        totalWinningsEl.style.color = '#f8fafc';
+                    }
+                }
+                if (totalWinningsTextEl) {
+                    totalWinningsTextEl.textContent = analytics.length === 0 ? 'Start tracking your games' : `${analytics.length} game${analytics.length !== 1 ? 's' : ''} tracked`;
+                }
+            }
+        }).catch(err => {
+            console.error('Error loading analytics for stats:', err);
+        });
+    }
+    
+    // Update win rate (from analytics)
+    const winRateEl = document.getElementById('stat-win-rate');
+    const winRateTextEl = document.getElementById('stat-win-rate-text');
+    if (winRateEl && window.firebaseDb && window.currentUser) {
+        const userId = window.currentUser.uid;
+        window.firebaseDb.collection('users').doc(userId).get().then(doc => {
+            if (doc.exists) {
+                const analytics = doc.data().analytics || [];
+                if (analytics.length > 0) {
+                    const wins = analytics.filter(game => (game.pnl || 0) > 0).length;
+                    const winRate = ((wins / analytics.length) * 100).toFixed(0);
+                    if (winRateEl) {
+                        winRateEl.textContent = `${winRate}%`;
+                    }
+                    if (winRateTextEl) {
+                        winRateTextEl.textContent = `${wins} win${wins !== 1 ? 's' : ''} out of ${analytics.length}`;
+                    }
+                } else {
+                    if (winRateEl) winRateEl.textContent = '-%';
+                    if (winRateTextEl) winRateTextEl.textContent = 'No data yet';
+                }
+            }
+        }).catch(err => {
+            console.error('Error loading analytics for win rate:', err);
+        });
+    }
+}
+
+// Filter your tables (placeholder for now)
+function filterYourTables(filter) {
+    // Update active tab
+    const tabs = document.querySelectorAll('.filter-tabs .filter-tab');
+    tabs.forEach(tab => {
+        if (tab.textContent.trim().toLowerCase() === filter.toLowerCase()) {
+            tab.classList.add('active');
+        } else {
+            tab.classList.remove('active');
+        }
+    });
+    
+    // TODO: Implement actual filtering logic
+    // For now, just show all tables
+    loadUserTrackers();
+}
+
 window.loadUserTrackers = loadUserTrackers;
 window.updateTrackerName = updateTrackerName;
 window.loadUserTracker = loadUserTracker;
+window.filterYourTables = filterYourTables;
 window.approveJoinRequest = approveJoinRequest;
 window.declineJoinRequest = declineJoinRequest;
 window.revokeFriendEditAccess = revokeFriendEditAccess;
