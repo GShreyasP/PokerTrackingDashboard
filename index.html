@@ -125,12 +125,14 @@
         <!-- Main Screen (shown when authenticated but no tracker) -->
         <div id="main-screen" class="main-screen hidden">
             <div class="main-screen-content">
-                <button id="create-tracker-btn" class="btn btn-primary btn-create-tracker" onclick="showSetupSection()">
-                    + Create Your Own Table
-                </button>
-                <button id="analytics-btn" class="btn btn-secondary btn-analytics" onclick="showAnalyticsPage()">
-                    Analytics
-                </button>
+                <div class="action-buttons">
+                    <button id="create-tracker-btn" class="btn btn-primary btn-create-tracker" onclick="showSetupSection()">
+                        Create Your Own Table
+                    </button>
+                    <button id="analytics-btn" class="btn btn-secondary btn-analytics" onclick="showAnalyticsPage()">
+                        Analytics
+                    </button>
+                </div>
                 <div id="tracker-limit-error" class="tracker-limit-error hidden"></div>
                 
                 <div class="your-tables-section">
