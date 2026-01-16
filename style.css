@@ -561,6 +561,34 @@ h3 {
     font-weight: 600;
 }
 
+.table-name-input-main {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid transparent;
+    color: #ffffff;
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: inherit;
+    padding: 0;
+    outline: none;
+    transition: border-color 0.3s ease;
+    cursor: text;
+}
+
+.table-name-input-main:hover {
+    border-bottom-color: rgba(148, 163, 184, 0.3);
+}
+
+.table-name-input-main:focus {
+    border-bottom-color: rgba(99, 102, 241, 0.5);
+    background: rgba(15, 23, 42, 0.3);
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin: -4px -8px 12px -8px;
+}
+
 .live-table-actions {
     display: flex;
     gap: 10px;

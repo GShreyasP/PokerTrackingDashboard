@@ -4249,11 +4249,13 @@ async function loadUserTrackers() {
             const hasPeople = trackerState.people && trackerState.people.length > 0;
             const trackerName = tracker.name || 'Untitled Table';
             
+            // Escape the tracker name to prevent XSS
+            const escapedName = trackerName.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             return `
                 <div class="live-table-widget">
                     <img src="assets/image-c90fcce1-ebd6-43e7-94b7-f3eb6415cdae.png" alt="Poker Table" class="live-table-image" onerror="this.style.display='none'">
                     <div class="live-table-info">
-                        <h3>${trackerName}</h3>
+                        <input type="text" class="table-name-input-main" value="${escapedName}" data-tracker-id="${tracker.id}" onblur="updateTrackerNameMain('${tracker.id}', this.value)" onkeypress="if(event.key === 'Enter') { this.blur(); }">
                         <div class="live-table-actions">
                             <button class="btn btn-primary" onclick="loadUserTracker('${tracker.id}')">Open Table</button>
                         </div>
@@ -4686,6 +4688,56 @@ window.closeAlertModal = closeAlertModal;
 window.requestJoinTracker = requestJoinTracker;
 window.loadLiveTables = loadLiveTables;
 // Update tracker name
+// Update tracker name from main page
+async function updateTrackerNameMain(trackerId, newName) {
+    if (!window.firebaseDb || !window.currentUser) {
+        return;
+    }
+    
+    const trimmedName = (newName || '').trim();
+    if (!trimmedName) {
+        // If empty, reload to restore original name
+        await loadUserTrackers();
+        return;
+    }
+    
+    try {
+        const userId = window.currentUser.uid;
+        const docRef = window.firebaseDb.collection('users').doc(userId);
+        const doc = await docRef.get();
+        
+        if (doc.exists && doc.data().trackers) {
+            const trackers = doc.data().trackers;
+            const updatedTrackers = trackers.map(tracker => {
+                if (tracker.id === trackerId) {
+                    return {
+                        ...tracker,
+                        name: trimmedName
+                    };
+                }
+                return tracker;
+            });
+            
+            await docRef.set({
+                trackers: updatedTrackers,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            
+            // Update local state if this is the current tracker
+            if (state.trackerId === trackerId) {
+                state.trackerName = trimmedName;
+            }
+            
+            console.log('Tracker name updated successfully');
+        }
+    } catch (error) {
+        console.error('Error updating tracker name:', error);
+        showAlertModal('Error updating table name. Please try again.');
+        // Reload to restore original name
+        await loadUserTrackers();
+    }
+}
+
 async function updateTrackerName(trackerId, newName) {
     if (!window.firebaseDb || !window.currentUser) {
         return;
@@ -4901,6 +4953,7 @@ window.showAnalyticsPage = showAnalyticsPage;
 window.deleteAnalyticsEntry = deleteAnalyticsEntry;
 window.clearTable = clearTable;
 window.selectPersonFromSearch = selectPersonFromSearch;
+window.updateTrackerNameMain = updateTrackerNameMain;
 
 // Install Instructions Modal Functions
 function showInstallInstructions() {
