@@ -493,13 +493,10 @@ async function showMainScreen() {
     if (authPage) authPage.classList.add('hidden');
     if (analyticsPage) analyticsPage.classList.add('hidden');
     
-    if (mainScreen) {
-        mainScreen.classList.remove('hidden');
-        // Load user trackers and live tables
-        if (window.firebaseDb && window.currentUser) {
-            await loadUserTrackers();
-            loadLiveTables();
-        }
+    // Hide tracking section first (with inline style for robustness)
+    if (trackingSection) {
+        trackingSection.classList.add('hidden');
+        trackingSection.style.display = 'none';
     }
     
     // Double-check setup section is hidden
@@ -508,8 +505,15 @@ async function showMainScreen() {
         setupSection.style.display = 'none';
     }
     
-    if (trackingSection) {
-        trackingSection.classList.add('hidden');
+    // Show main screen (with inline style to ensure visibility)
+    if (mainScreen) {
+        mainScreen.classList.remove('hidden');
+        mainScreen.style.display = ''; // Ensure it's visible
+        // Load user trackers and live tables
+        if (window.firebaseDb && window.currentUser) {
+            await loadUserTrackers();
+            loadLiveTables();
+        }
     }
     
     // Hide back to home button when on main screen (you're already home!)
