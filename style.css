@@ -554,8 +554,9 @@ h3 {
     padding: 20px;
 }
 
-.live-table-info h3 {
-    color: #f8fafc;
+.live-table-info h3,
+.live-table-info h3.live-table-name {
+    color: #ffffff;
     margin: 0 0 16px 0;
     font-size: 16px;
     font-weight: 600;

@@ -4383,18 +4383,23 @@ async function loadLiveTables() {
         }
         
         // Render live table widgets
-        liveTablesContainer.innerHTML = liveTables.map(table => `
+        liveTablesContainer.innerHTML = liveTables.map(table => {
+            // Escape the friend name to prevent XSS
+            const escapedFriendName = table.friendName.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const tableName = `${escapedFriendName}'s Table`;
+            return `
             <div class="live-table-widget">
                 <img src="assets/image-c90fcce1-ebd6-43e7-94b7-f3eb6415cdae.png" alt="Poker Table" class="live-table-image" onerror="this.style.display='none'">
                 <div class="live-table-info">
-                    <h3>${table.friendName}'s Table</h3>
+                    <h3 class="live-table-name">${tableName}</h3>
                     <div class="live-table-actions">
                         <button class="btn btn-primary" onclick="showJoinTrackerModal('${table.friendId}', '${table.friendName.replace(/'/g, "\\'")}')">Join Table</button>
                         <button class="btn btn-secondary" onclick="viewFriendTracker('${table.friendId}')">View Table</button>
                     </div>
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
     } catch (error) {
         console.error('Error loading live tables:', error);
         liveTablesContainer.innerHTML = '<p class="no-live-tables">Error loading live tables</p>';
