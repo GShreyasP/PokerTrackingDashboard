@@ -1382,15 +1382,28 @@ async function startTracking() {
         }
     }
     
-    // Hide setup, show tracking
+    // Hide setup and main screen, show tracking
     const backToHomeBtn = document.getElementById('back-to-main-btn');
     // Show back to home button when viewing a tracker
     if (backToHomeBtn && window.currentUser) {
         backToHomeBtn.classList.remove('hidden');
     }
     
-    setupSection.classList.add('hidden');
-    trackingSection.classList.remove('hidden');
+    // Hide main screen and setup section, show tracking section
+    if (mainScreen) mainScreen.classList.add('hidden');
+    if (setupSection) {
+        setupSection.classList.add('hidden');
+        setupSection.style.display = 'none'; // Force hide with inline style
+    }
+    if (trackingSection) {
+        trackingSection.classList.remove('hidden');
+        trackingSection.style.display = ''; // Ensure it's visible
+    }
+    
+    // Save viewing state (viewing own tracker)
+    trackerViewState.isViewingFriendTracker = false;
+    trackerViewState.isOwner = true;
+    saveViewingState();
     
     // Render widgets and update display
     renderPeopleWidgets();
