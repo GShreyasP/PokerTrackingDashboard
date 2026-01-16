@@ -2516,6 +2516,58 @@ let isLoadingFriendsList = false; // Flag to prevent concurrent calls
 let friendsListLoadTimer = null; // Debounce timer
 
 // Toggle friends sidebar
+// Toggle left sidebar menu
+function toggleSidebarMenu() {
+    const sidebar = document.getElementById('sidebar-menu');
+    const overlay = document.getElementById('sidebar-overlay-menu');
+
+    if (sidebar && overlay) {
+        const isHidden = sidebar.classList.contains('hidden');
+        if (isHidden) {
+            sidebar.classList.remove('hidden');
+            overlay.classList.remove('hidden');
+            // Update friends badge in sidebar if needed
+            updateSidebarFriendsBadge();
+        } else {
+            sidebar.classList.add('hidden');
+            overlay.classList.add('hidden');
+        }
+    }
+}
+
+// Update friends badge in sidebar menu
+function updateSidebarFriendsBadge() {
+    const badge = document.getElementById('sidebar-friends-badge');
+    const friendsBadge = document.getElementById('friends-notification-badge');
+    if (badge && friendsBadge) {
+        const count = friendsBadge.textContent;
+        if (count && count !== '0' && !friendsBadge.classList.contains('hidden')) {
+            badge.textContent = count;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+}
+
+// Show invite people modal
+function showInvitePeopleModal() {
+    // Use existing invite link functionality from friends sidebar
+    toggleFriendsSidebar();
+    // Scroll to invite section if needed
+    setTimeout(() => {
+        const inviteSection = document.querySelector('.friends-invite-section');
+        if (inviteSection) {
+            inviteSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, 300);
+}
+
+// Show settings modal (placeholder for now)
+function showSettingsModal() {
+    showAlertModal('Settings coming soon!');
+}
+
 function toggleFriendsSidebar() {
     const sidebar = document.getElementById('friends-sidebar');
     const overlay = document.getElementById('sidebar-overlay');
@@ -2588,6 +2640,9 @@ function showFriendsButton() {
         friendsBtn.classList.add('hidden');
         friendsBtn.style.display = 'none'; // Force hide with inline style
     }
+    
+    // Show/hide hamburger menu button
+    showHamburgerButton();
 }
 
 // Hide friends button when signed out
@@ -2597,6 +2652,42 @@ function hideFriendsButton() {
         friendsBtn.classList.add('hidden');
         friendsBtn.style.display = 'none'; // Force hide with inline style
     }
+    
+    // Hide hamburger menu button
+    hideHamburgerButton();
+}
+
+// Show hamburger menu button when authenticated
+function showHamburgerButton() {
+    const hamburgerBtn = document.getElementById('hamburger-menu-btn');
+    const pageHeader = document.querySelector('.page-header');
+    const authPage = document.getElementById('auth-page');
+    
+    if (hamburgerBtn && pageHeader && window.currentUser && authPage && authPage.classList.contains('hidden')) {
+        hamburgerBtn.style.display = 'flex';
+        pageHeader.classList.add('authenticated');
+    } else if (hamburgerBtn && pageHeader) {
+        hamburgerBtn.style.display = 'none';
+        pageHeader.classList.remove('authenticated');
+    }
+}
+
+// Hide hamburger menu button when signed out
+function hideHamburgerButton() {
+    const hamburgerBtn = document.getElementById('hamburger-menu-btn');
+    const pageHeader = document.querySelector('.page-header');
+    if (hamburgerBtn) {
+        hamburgerBtn.style.display = 'none';
+    }
+    if (pageHeader) {
+        pageHeader.classList.remove('authenticated');
+    }
+    
+    // Close sidebar menu if open
+    const sidebar = document.getElementById('sidebar-menu');
+    const overlay = document.getElementById('sidebar-overlay-menu');
+    if (sidebar) sidebar.classList.add('hidden');
+    if (overlay) overlay.classList.add('hidden');
 }
 
 // Search for friend by email or name
@@ -2965,6 +3056,7 @@ async function updateAllNotifications() {
         totalCount += editRequestsSnapshot.size;
         
         updateFriendsNotificationBadge(totalCount);
+        updateSidebarFriendsBadge();
     } catch (error) {
         console.error('Error updating notifications:', error);
     }
@@ -4787,6 +4879,9 @@ window.showForgotPasswordForm = showForgotPasswordForm;
 window.backToLogin = backToLogin;
 window.sendPasswordReset = sendPasswordReset;
 window.toggleFriendsSidebar = toggleFriendsSidebar;
+window.toggleSidebarMenu = toggleSidebarMenu;
+window.showInvitePeopleModal = showInvitePeopleModal;
+window.showSettingsModal = showSettingsModal;
 window.searchFriend = searchFriend;
 window.sendFriendRequest = sendFriendRequest;
 window.acceptFriendRequest = acceptFriendRequest;
@@ -4795,6 +4890,8 @@ window.copyInviteLink = copyInviteLink;
 window.updateOnlineStatus = updateOnlineStatus;
 window.showFriendsButton = showFriendsButton;
 window.hideFriendsButton = hideFriendsButton;
+window.showHamburgerButton = showHamburgerButton;
+window.hideHamburgerButton = hideHamburgerButton;
 window.checkFriendRequestNotifications = checkFriendRequestNotifications;
 window.updateAllNotifications = updateAllNotifications;
 window.loadState = loadState; // Make available for firebase-init.js

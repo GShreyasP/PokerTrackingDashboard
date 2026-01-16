@@ -44,6 +44,33 @@ body::before {
     z-index: 1;
 }
 
+/* Hamburger Menu Button */
+.hamburger-menu-btn {
+    display: none; /* Hidden by default, shown when authenticated */
+    background: rgba(51, 65, 85, 0.5);
+    border: 1px solid rgba(71, 85, 105, 0.5);
+    border-radius: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #cbd5e1;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+}
+
+.hamburger-menu-btn:hover {
+    background: rgba(51, 65, 85, 0.8);
+    border-color: rgba(71, 85, 105, 0.8);
+    color: #f8fafc;
+}
+
+.hamburger-menu-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
 .page-header {
     background: rgba(15, 23, 42, 0.8);
     backdrop-filter: blur(20px);
@@ -64,12 +91,166 @@ body::before {
     margin-top: -20px;
 }
 
+.page-header.authenticated .hamburger-menu-btn {
+    display: flex;
+}
+
 @media (max-width: 768px) {
     .page-header {
         padding: 12px 20px;
         margin-left: -20px;
         margin-right: -20px;
         margin-top: -20px;
+    }
+    
+    .hamburger-menu-btn {
+        display: flex !important;
+    }
+}
+
+/* Left Sidebar Menu */
+.sidebar-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 280px;
+    max-width: 85vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-right: 1px solid rgba(148, 163, 184, 0.2);
+    box-shadow: 4px 0 40px rgba(0, 0, 0, 0.5);
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+}
+
+.sidebar-menu:not(.hidden) {
+    transform: translateX(0);
+}
+
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.sidebar-header h2 {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+.sidebar-close-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    color: #cbd5e1;
+    font-size: 24px;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    line-height: 1;
+}
+
+.sidebar-close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #f8fafc;
+    border-color: rgba(148, 163, 184, 0.3);
+}
+
+.sidebar-nav {
+    padding: 20px 0;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.sidebar-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    color: #cbd5e1;
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+    position: relative;
+}
+
+.sidebar-menu-item:hover {
+    background: rgba(99, 102, 241, 0.1);
+    color: #f8fafc;
+    border-left-color: #6366f1;
+}
+
+.sidebar-menu-item:active {
+    background: rgba(99, 102, 241, 0.2);
+}
+
+.menu-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    stroke: currentColor;
+}
+
+.menu-badge {
+    margin-left: auto;
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 20px;
+    text-align: center;
+}
+
+.sidebar-divider {
+    height: 1px;
+    background: rgba(148, 163, 184, 0.2);
+    margin: 12px 20px;
+}
+
+.sidebar-overlay-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.sidebar-overlay-menu:not(.hidden) {
+    opacity: 1;
+    visibility: visible;
+}
+
+@media (max-width: 768px) {
+    .sidebar-menu {
+        width: 100vw;
+        max-width: 100vw;
     }
 }
 

@@ -66,11 +66,14 @@ async function initFirebase() {
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
                 
-                // Show friends button only after authenticated view is shown and auth page is hidden
+                // Show friends button and hamburger menu only after authenticated view is shown and auth page is hidden
                 // Use setTimeout to ensure auth page is hidden first
                 setTimeout(() => {
                     if (window.showFriendsButton) {
                         window.showFriendsButton();
+                    }
+                    if (window.showHamburgerButton) {
+                        window.showHamburgerButton();
                     }
                 }, 100);
                 
@@ -102,9 +105,12 @@ async function initFirebase() {
                 
                 window.currentUser = null;
                 
-                // Hide friends button
+                // Hide friends button and hamburger menu
                 if (window.hideFriendsButton) {
                     window.hideFriendsButton();
+                }
+                if (window.hideHamburgerButton) {
+                    window.hideHamburgerButton();
                 }
                 
                 showAuthPage();
