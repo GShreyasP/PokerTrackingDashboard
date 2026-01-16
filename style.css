@@ -45,12 +45,32 @@ body::before {
 }
 
 .page-header {
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+    padding: 16px 40px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 30px;
+    margin-bottom: 0;
     flex-wrap: wrap;
     gap: 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    margin-left: -20px;
+    margin-right: -20px;
+    margin-top: -20px;
+}
+
+@media (max-width: 768px) {
+    .page-header {
+        padding: 12px 20px;
+        margin-left: -20px;
+        margin-right: -20px;
+        margin-top: -20px;
+    }
 }
 
 .header-actions-right {
@@ -61,12 +81,10 @@ body::before {
 
 h1 {
     text-align: left;
-    color: #f8fafc;
+    color: #fff;
     margin: 0;
-    font-size: 2.5em;
-    text-shadow: 
-        0 2px 10px rgba(0, 0, 0, 0.4),
-        0 0 20px rgba(99, 102, 241, 0.2);
+    font-size: 24px;
+    text-shadow: none;
     flex: 1;
     font-weight: 700;
     letter-spacing: -0.5px;
@@ -82,10 +100,11 @@ h1 span {
 .header-user-info {
     display: flex;
     align-items: center;
-    gap: 15px;
-    background: rgba(255, 255, 255, 0.2);
-    padding: 10px 15px;
+    gap: 12px;
+    background: rgba(30, 41, 59, 0.5);
+    padding: 8px 16px;
     border-radius: 8px;
+    border: 1px solid rgba(148, 163, 184, 0.1);
     color: white;
 }
 
@@ -96,31 +115,32 @@ h1 span {
 }
 
 .header-user-info span {
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 14px;
 }
 
 .header-user-id {
-    font-size: 0.75em;
-    opacity: 0.8;
+    font-size: 12px;
+    color: #64748b;
     font-weight: 400;
 }
 
 .btn-sign-out {
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    padding: 10px 16px;
-    font-size: 0.9em;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    padding: 8px 20px;
+    font-size: 14px;
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
     border-radius: 8px;
-    transition: all 0.3s;
+    transition: all 0.3s ease;
 }
 
 .btn-sign-out:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: translateY(-2px);
+    background: rgba(239, 68, 68, 0.2);
+    transform: translateY(-1px);
 }
 
 /* Authentication Page */
@@ -1590,16 +1610,16 @@ h3 {
 
 /* Friends System Styles */
 .btn-friends {
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    padding: 10px 20px;
-    font-size: 1em;
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    padding: 8px 20px;
+    font-size: 14px;
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
     border-radius: 8px;
-    transition: all 0.3s;
+    transition: all 0.3s ease;
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -1612,8 +1632,9 @@ h3 {
 }
 
 .btn-friends:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: translateY(-2px);
+    background: rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.5);
+    transform: translateY(-1px);
 }
 
 .notification-badge {
