@@ -513,7 +513,7 @@ async function showMainScreen() {
         if (window.firebaseDb && window.currentUser) {
             await loadUserTrackers();
             await loadLiveTables();
-            updateStats();
+            // Stats are now on analytics page, no need to update here
         }
     }
     
@@ -4465,7 +4465,11 @@ async function loadUserTrackers() {
                 </div>
             `;
         }).join('');
-        updateStats();
+        // Stats are now on analytics page, only update if on analytics page
+        const analyticsPage = document.getElementById('analytics-page');
+        if (analyticsPage && !analyticsPage.classList.contains('hidden')) {
+            updateStats();
+        }
     } catch (error) {
         console.error('Error loading user trackers:', error);
         yourTablesContainer.innerHTML = '';
@@ -5200,6 +5204,9 @@ async function loadAnalytics() {
         const analytics = userData.analytics || [];
         
         displayAnalytics(analytics);
+        
+        // Update stats cards on analytics page (Total Tables, Active Sessions, etc.)
+        updateStats();
     } catch (error) {
         console.error('Error loading analytics:', error);
         showAlertModal('Error loading analytics. Please try again.');

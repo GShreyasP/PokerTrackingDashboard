@@ -339,6 +339,8 @@ h1 span {
     width: 20px;
     height: 20px;
     stroke: currentColor;
+    fill: none;
+    display: block;
 }
 
 /* New Table Button */

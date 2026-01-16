@@ -202,8 +202,52 @@
         <!-- Main Screen (shown when authenticated but no tracker) -->
         <div id="main-screen" class="main-screen hidden">
             <div class="main-screen-content">
-                <!-- Stats Overview -->
-                <div class="stats-grid">
+                <div id="tracker-limit-error" class="tracker-limit-error hidden"></div>
+                
+                <!-- Your Tables Section -->
+                <section class="your-tables-section" style="margin-bottom: 48px;">
+                    <div class="section-header">
+                        <div>
+                            <h2 class="section-title">Your Tables</h2>
+                            <p class="section-subtitle">Manage and track your poker games</p>
+                        </div>
+                    </div>
+                    <div id="your-tables-container" class="tables-grid">
+                        <div class="empty-state" id="your-tables-empty">
+                            <div class="empty-icon">🎲</div>
+                            <h3 class="empty-title">No tables created yet</h3>
+                            <p class="empty-description">Create your first table to start tracking your poker games and winnings</p>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Live Tables Section -->
+                <section class="live-tables-section">
+                    <div class="section-header">
+                        <div>
+                            <h2 class="section-title">Live Tables</h2>
+                            <p class="section-subtitle">Join ongoing games from your friends</p>
+                        </div>
+                    </div>
+                    <div id="live-tables-container" class="tables-grid">
+                        <div class="empty-state" id="live-tables-empty">
+                            <div class="empty-icon">🎲</div>
+                            <h3 class="empty-title">No live tables available</h3>
+                            <p class="empty-description">No friends are currently hosting active games</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+        
+        <!-- Analytics Page -->
+        <div id="analytics-page" class="analytics-page hidden">
+            <div class="analytics-content">
+                <div class="analytics-header">
+                    <h2>Analytics</h2>
+                </div>
+                <!-- Stats Overview (moved from home page) -->
+                <div class="stats-grid" style="margin-bottom: 40px;">
                     <div class="stat-card">
                         <div class="stat-header">
                             <div class="stat-label">Total Tables</div>
@@ -265,72 +309,6 @@
                             <span id="stat-win-rate-text">No data yet</span>
                         </div>
                     </div>
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="action-section">
-                    <button id="create-tracker-btn" class="btn-action btn-primary" onclick="showSetupSection()">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 5v14M5 12h14"/>
-                        </svg>
-                        Create Your Own Table
-                    </button>
-                    <button id="analytics-btn" class="btn-action btn-secondary" onclick="showAnalyticsPage()">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 3v18h18"/>
-                            <path d="M7 12l4-4 4 4 6-6"/>
-                        </svg>
-                        View Analytics
-                    </button>
-                </div>
-                <div id="tracker-limit-error" class="tracker-limit-error hidden"></div>
-                
-                <!-- Your Tables Section -->
-                <section class="your-tables-section" style="margin-bottom: 48px;">
-                    <div class="section-header">
-                        <div>
-                            <h2 class="section-title">Your Tables</h2>
-                            <p class="section-subtitle">Manage and track your poker games</p>
-                        </div>
-                        <div class="filter-tabs">
-                            <button class="filter-tab active" onclick="filterYourTables('all')">All</button>
-                            <button class="filter-tab" onclick="filterYourTables('active')">Active</button>
-                            <button class="filter-tab" onclick="filterYourTables('completed')">Completed</button>
-                        </div>
-                    </div>
-                    <div id="your-tables-container" class="tables-grid">
-                        <div class="empty-state" id="your-tables-empty">
-                            <div class="empty-icon">🎲</div>
-                            <h3 class="empty-title">No tables created yet</h3>
-                            <p class="empty-description">Create your first table to start tracking your poker games and winnings</p>
-                        </div>
-                    </div>
-                </section>
-                
-                <!-- Live Tables Section -->
-                <section class="live-tables-section">
-                    <div class="section-header">
-                        <div>
-                            <h2 class="section-title">Live Tables</h2>
-                            <p class="section-subtitle">Join ongoing games from your friends</p>
-                        </div>
-                    </div>
-                    <div id="live-tables-container" class="tables-grid">
-                        <div class="empty-state" id="live-tables-empty">
-                            <div class="empty-icon">🎲</div>
-                            <h3 class="empty-title">No live tables available</h3>
-                            <p class="empty-description">No friends are currently hosting active games</p>
-                        </div>
-                    </div>
-                </section>
-            </div>
-        </div>
-        
-        <!-- Analytics Page -->
-        <div id="analytics-page" class="analytics-page hidden">
-            <div class="analytics-content">
-                <div class="analytics-header">
-                    <h2>Analytics</h2>
                 </div>
                 <div id="analytics-stats" class="analytics-stats">
                     <div class="stat-card">
