@@ -345,15 +345,36 @@ async function loadUserData(userId) {
                     const mainScreen = document.getElementById('main-screen');
                     const setupSection = document.getElementById('setup-section');
                     const trackingSection = document.getElementById('tracking-section');
+                    const settingsPage = document.getElementById('settings-page');
+                    const analyticsPage = document.getElementById('analytics-page');
                     const backToHomeBtn = document.getElementById('back-to-main-btn');
                     
                     // Show back to home button when viewing a tracker
                     if (backToHomeBtn && window.currentUser) {
                         backToHomeBtn.classList.remove('hidden');
                     }
-                    if (mainScreen) mainScreen.classList.add('hidden');
-                    if (setupSection) setupSection.classList.add('hidden');
-                    if (trackingSection) trackingSection.classList.remove('hidden');
+                    
+                    // Hide all other pages with inline styles
+                    if (mainScreen) {
+                        mainScreen.classList.add('hidden');
+                        mainScreen.style.display = 'none';
+                    }
+                    if (setupSection) {
+                        setupSection.classList.add('hidden');
+                        setupSection.style.display = 'none';
+                    }
+                    if (settingsPage) {
+                        settingsPage.classList.add('hidden');
+                        settingsPage.style.display = 'none';
+                    }
+                    if (analyticsPage) {
+                        analyticsPage.classList.add('hidden');
+                        analyticsPage.style.display = 'none';
+                    }
+                    if (trackingSection) {
+                        trackingSection.classList.remove('hidden');
+                        trackingSection.style.display = '';
+                    }
                     
                     renderPeopleWidgets();
                     updateTotalPot();
@@ -481,6 +502,7 @@ async function showMainScreen() {
     const trackingSection = document.getElementById('tracking-section');
     const authPage = document.getElementById('auth-page');
     const analyticsPage = document.getElementById('analytics-page');
+    const settingsPage = document.getElementById('settings-page');
     const backToHomeBtn = document.getElementById('back-to-main-btn');
     
     // IMPORTANT: Always hide setup section first when showing main screen
@@ -489,9 +511,16 @@ async function showMainScreen() {
         setupSection.style.display = 'none'; // Force hide with inline style
     }
     
-    // Hide auth page and analytics page if visible
+    // Hide auth page, analytics page, and settings page if visible
     if (authPage) authPage.classList.add('hidden');
-    if (analyticsPage) analyticsPage.classList.add('hidden');
+    if (analyticsPage) {
+        analyticsPage.classList.add('hidden');
+        analyticsPage.style.display = 'none';
+    }
+    if (settingsPage) {
+        settingsPage.classList.add('hidden');
+        settingsPage.style.display = 'none';
+    }
     
     // Hide tracking section first (with inline style for robustness)
     if (trackingSection) {
@@ -571,11 +600,22 @@ async function showSetupSection() {
     const mainScreen = document.getElementById('main-screen');
     const setupSection = document.getElementById('setup-section');
     const trackingSection = document.getElementById('tracking-section');
+    const settingsPage = document.getElementById('settings-page');
+    const analyticsPage = document.getElementById('analytics-page');
     const backToHomeBtn = document.getElementById('back-to-main-btn');
     
+    // Hide all other pages with inline styles
     if (mainScreen) {
         mainScreen.classList.add('hidden');
         mainScreen.style.display = 'none'; // Force hide
+    }
+    if (settingsPage) {
+        settingsPage.classList.add('hidden');
+        settingsPage.style.display = 'none';
+    }
+    if (analyticsPage) {
+        analyticsPage.classList.add('hidden');
+        analyticsPage.style.display = 'none';
     }
     if (setupSection) {
         setupSection.classList.remove('hidden');
@@ -1389,16 +1429,30 @@ async function startTracking() {
     
     // Hide setup and main screen, show tracking
     const backToHomeBtn = document.getElementById('back-to-main-btn');
+    const settingsPage = document.getElementById('settings-page');
+    const analyticsPage = document.getElementById('analytics-page');
+    
     // Show back to home button when viewing a tracker
     if (backToHomeBtn && window.currentUser) {
         backToHomeBtn.classList.remove('hidden');
     }
     
-    // Hide main screen and setup section, show tracking section
-    if (mainScreen) mainScreen.classList.add('hidden');
+    // Hide all other pages with inline styles
+    if (mainScreen) {
+        mainScreen.classList.add('hidden');
+        mainScreen.style.display = 'none';
+    }
     if (setupSection) {
         setupSection.classList.add('hidden');
         setupSection.style.display = 'none'; // Force hide with inline style
+    }
+    if (settingsPage) {
+        settingsPage.classList.add('hidden');
+        settingsPage.style.display = 'none';
+    }
+    if (analyticsPage) {
+        analyticsPage.classList.add('hidden');
+        analyticsPage.style.display = 'none';
     }
     if (trackingSection) {
         trackingSection.classList.remove('hidden');
@@ -2571,13 +2625,28 @@ async function showSettingsPage() {
     const trackingSection = document.getElementById('tracking-section');
     const analyticsPage = document.getElementById('analytics-page');
     
-    if (mainScreen) mainScreen.classList.add('hidden');
-    if (setupSection) setupSection.classList.add('hidden');
-    if (trackingSection) trackingSection.classList.add('hidden');
-    if (analyticsPage) analyticsPage.classList.add('hidden');
+    // Hide all other pages with inline styles for robustness
+    if (mainScreen) {
+        mainScreen.classList.add('hidden');
+        mainScreen.style.display = 'none';
+    }
+    if (setupSection) {
+        setupSection.classList.add('hidden');
+        setupSection.style.display = 'none';
+    }
+    if (trackingSection) {
+        trackingSection.classList.add('hidden');
+        trackingSection.style.display = 'none';
+    }
+    if (analyticsPage) {
+        analyticsPage.classList.add('hidden');
+        analyticsPage.style.display = 'none';
+    }
     
+    // Show settings page with inline style to ensure visibility
     if (settingsPage) {
         settingsPage.classList.remove('hidden');
+        settingsPage.style.display = '';
         await loadSettingsData();
     }
 }
@@ -3918,15 +3987,39 @@ async function viewFriendTracker(friendId) {
         restoreState(friendState);
         
         // Hide main screen and setup, show tracking section
+        const mainScreen = document.getElementById('main-screen');
+        const setupSection = document.getElementById('setup-section');
+        const trackingSection = document.getElementById('tracking-section');
+        const settingsPage = document.getElementById('settings-page');
+        const analyticsPage = document.getElementById('analytics-page');
         const backToHomeBtn = document.getElementById('back-to-main-btn');
+        
         // Show back to home button when viewing a tracker
         if (backToHomeBtn && window.currentUser) {
             backToHomeBtn.classList.remove('hidden');
         }
         
-        if (mainScreen) mainScreen.classList.add('hidden');
-        if (setupSection) setupSection.classList.add('hidden');
-        if (trackingSection) trackingSection.classList.remove('hidden');
+        // Hide all other pages with inline styles
+        if (mainScreen) {
+            mainScreen.classList.add('hidden');
+            mainScreen.style.display = 'none';
+        }
+        if (setupSection) {
+            setupSection.classList.add('hidden');
+            setupSection.style.display = 'none';
+        }
+        if (settingsPage) {
+            settingsPage.classList.add('hidden');
+            settingsPage.style.display = 'none';
+        }
+        if (analyticsPage) {
+            analyticsPage.classList.add('hidden');
+            analyticsPage.style.display = 'none';
+        }
+        if (trackingSection) {
+            trackingSection.classList.remove('hidden');
+            trackingSection.style.display = '';
+        }
         
         // Update UI for read-only mode
         updateUIForViewingMode(hasEditAccess);
@@ -4653,6 +4746,8 @@ async function loadUserTracker(trackerId) {
         const mainScreen = document.getElementById('main-screen');
         const setupSection = document.getElementById('setup-section');
         const trackingSection = document.getElementById('tracking-section');
+        const settingsPage = document.getElementById('settings-page');
+        const analyticsPage = document.getElementById('analytics-page');
         const backToHomeBtn = document.getElementById('back-to-main-btn');
         
         // Show back to home button when viewing a tracker
@@ -4660,7 +4755,7 @@ async function loadUserTracker(trackerId) {
             backToHomeBtn.classList.remove('hidden');
         }
         
-        // Hide main screen and setup section with inline styles for robustness
+        // Hide all other pages with inline styles for robustness
         if (mainScreen) {
             mainScreen.classList.add('hidden');
             mainScreen.style.display = 'none';
@@ -4668,6 +4763,14 @@ async function loadUserTracker(trackerId) {
         if (setupSection) {
             setupSection.classList.add('hidden');
             setupSection.style.display = 'none';
+        }
+        if (settingsPage) {
+            settingsPage.classList.add('hidden');
+            settingsPage.style.display = 'none';
+        }
+        if (analyticsPage) {
+            analyticsPage.classList.add('hidden');
+            analyticsPage.style.display = 'none';
         }
         // Show tracking section with inline style to ensure visibility
         if (trackingSection) {
@@ -5310,12 +5413,30 @@ async function showAnalyticsPage() {
     const analyticsPage = document.getElementById('analytics-page');
     const setupSection = document.getElementById('setup-section');
     const trackingSection = document.getElementById('tracking-section');
+    const settingsPage = document.getElementById('settings-page');
     
-    if (mainScreen) mainScreen.classList.add('hidden');
-    if (setupSection) setupSection.classList.add('hidden');
-    if (trackingSection) trackingSection.classList.add('hidden');
+    // Hide all other pages with inline styles for robustness
+    if (mainScreen) {
+        mainScreen.classList.add('hidden');
+        mainScreen.style.display = 'none';
+    }
+    if (setupSection) {
+        setupSection.classList.add('hidden');
+        setupSection.style.display = 'none';
+    }
+    if (trackingSection) {
+        trackingSection.classList.add('hidden');
+        trackingSection.style.display = 'none';
+    }
+    if (settingsPage) {
+        settingsPage.classList.add('hidden');
+        settingsPage.style.display = 'none';
+    }
+    
+    // Show analytics page with inline style to ensure visibility
     if (analyticsPage) {
         analyticsPage.classList.remove('hidden');
+        analyticsPage.style.display = '';
         await loadAnalytics();
     }
 }
