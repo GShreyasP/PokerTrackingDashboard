@@ -449,6 +449,22 @@ h1 span {
     opacity: 0.1;
     left: var(--left, 50%);
     top: -64px;
+    background: #1a1a1a;
+    animation: slideChip var(--duration, 8s) linear infinite;
+    animation-delay: var(--delay, 0s);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    box-shadow: none;
+}
+
+/* Outer edge segments - only at the rim using mask */
+.auth-chip::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
     background: 
         /* Outer white edge segments (8 segments) */
         conic-gradient(
@@ -469,41 +485,22 @@ h1 span {
             transparent 292.5deg 315deg,
             rgba(255, 255, 255, 0.8) 315deg 337.5deg,
             transparent 337.5deg 360deg
-        ),
-        /* Dark main body */
-        #1a1a1a;
-    background-clip: padding-box, border-box;
-    border: 4px solid transparent;
-    animation: slideChip var(--duration, 8s) linear infinite;
-    animation-delay: var(--delay, 0s);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    /* Remove shadows for flat design */
-    box-shadow: none;
+        );
+    /* Mask to only show segments at the outer edge (rim only) */
+    mask: radial-gradient(circle, transparent 52px, black 52px);
+    -webkit-mask: radial-gradient(circle, transparent 52px, black 52px);
+    pointer-events: none;
 }
 
-.auth-chip::before {
+/* Dashed inner ring */
+.auth-chip::after {
     content: '';
     position: absolute;
     width: 42px;
     height: 42px;
     border-radius: 50%;
-    /* Dashed inner ring using border */
     border: 1.5px dashed rgba(255, 255, 255, 0.8);
-    border-style: dashed;
     box-sizing: border-box;
-}
-
-.auth-chip::after {
-    content: '';
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #1a1a1a;
-    /* Solid dark center */
 }
 
 @keyframes slideChip {
