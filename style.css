@@ -448,7 +448,7 @@ h1 span {
     border-radius: 50%;
     opacity: 0.1;
     left: 100vw;
-    top: var(--top, 10%);
+    top: -64px;
     background: #1a1a1a;
     animation: slideChip var(--duration, 8s) linear infinite;
     animation-delay: var(--delay, 0s);
