@@ -857,6 +857,7 @@ h3 {
     max-width: 1600px;
     margin: 0 auto;
     padding: 48px;
+    padding-top: calc(48px + 80px); /* Account for fixed header height */
 }
 
 /* Stats Overview */
@@ -1302,6 +1303,7 @@ h3 {
 @media (max-width: 768px) {
     .main-screen-content {
         padding: 24px 20px;
+        padding-top: calc(24px + 80px); /* Account for fixed header height */
     }
 
     .stats-grid {
@@ -1566,6 +1568,7 @@ h3 {
     background: transparent;
     border-radius: 0;
     padding: 40px 20px;
+    padding-top: calc(40px + 80px); /* Account for fixed header height */
     box-shadow: none;
     position: relative;
     z-index: 1;
@@ -3104,6 +3107,7 @@ h3 {
 .analytics-content {
     width: 100%;
     padding: 40px 20px;
+    padding-top: calc(40px + 80px); /* Account for fixed header height */
 }
 
 .analytics-header {
@@ -3417,6 +3421,7 @@ h3 {
 .settings-content {
     width: 100%;
     padding: 40px 20px;
+    padding-top: calc(40px + 80px); /* Account for fixed header height */
 }
 
 .settings-header {
