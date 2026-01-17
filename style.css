@@ -23,11 +23,12 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: #0f172a;
+    background: #0f172a !important;
     min-height: 100vh;
     padding: 0;
     margin: 0;
     overflow: hidden;
+    z-index: -1;
 }
 
 @keyframes gradientShift {
@@ -49,6 +50,17 @@ body::before {
         radial-gradient(circle at 40% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
     pointer-events: none;
     z-index: 0;
+}
+
+/* Hide body background layers when auth page is visible */
+body:has(.auth-page:not(.hidden)) {
+    background: #0f172a !important;
+    background-size: auto !important;
+    animation: none !important;
+}
+
+body:has(.auth-page:not(.hidden))::before {
+    display: none;
 }
 
 .container {
@@ -467,9 +479,14 @@ h1 span {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    position: relative;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 1;
     padding: 20px;
+    background: #0f172a !important;
 }
 
 .auth-container {
