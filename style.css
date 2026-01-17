@@ -447,8 +447,8 @@ h1 span {
     height: 64px;
     border-radius: 50%;
     opacity: 0.1;
-    left: var(--left, 50%);
-    top: -64px;
+    left: 100vw;
+    top: var(--top, 10%);
     background: #1a1a1a;
     animation: slideChip var(--duration, 8s) linear infinite;
     animation-delay: var(--delay, 0s);
@@ -508,7 +508,7 @@ h1 span {
         transform: translate(0, 0) rotate(0deg);
     }
     100% {
-        transform: translate(-100vw, 100vh) rotate(360deg);
+        transform: translate(calc(-100vw - 64px), 0) rotate(360deg);
     }
 }
 
