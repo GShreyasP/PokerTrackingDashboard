@@ -2374,14 +2374,31 @@ h3 {
     margin-bottom: 8px;
     padding: 10px;
     font-size: 0.85em;
+    color: #1a1a1a;
 }
 
 .personal-log-content .log-time {
     font-size: 0.75em;
+    color: #4a5568;
 }
 
 .personal-log-content .log-details {
     font-size: 0.9em;
+    color: #2d3748;
+}
+
+.personal-log-content .log-person {
+    color: #1a1a1a;
+    font-weight: 600;
+}
+
+.personal-log-content .log-action {
+    color: #4a5568;
+}
+
+.personal-log-content .log-amount {
+    color: #1a1a1a;
+    font-weight: bold;
 }
 
 /* Scrollbar styling */
