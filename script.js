@@ -1686,6 +1686,11 @@ function showAddForm(personId) {
                     <input type="number" id="add-stacks-${personId}" min="0" step="0.1" class="form-input" placeholder="1">
                     <small>You can enter partial stacks (e.g., 0.5)</small>
                 </div>
+                <div class="quick-add-buttons" style="margin-top: 12px; margin-bottom: 8px;">
+                    <button type="button" class="btn-quick-add" onclick="setQuickAddStacks(${personId}, 0.5)">50% (0.5)</button>
+                    <button type="button" class="btn-quick-add" onclick="setQuickAddStacks(${personId}, 1)">100% (1)</button>
+                    <button type="button" class="btn-quick-add" onclick="setQuickAddStacks(${personId}, 2)">200% (2)</button>
+                </div>
                 <div class="form-actions">
                     <button class="btn btn-submit" onclick="submitAdd(${personId})">Add</button>
                     <button class="btn btn-cancel" onclick="hideForm(${personId})">Cancel</button>
@@ -5124,6 +5129,17 @@ function useQuickAdd(multiplier) {
     }
 }
 
+// Set quick-add stacks value in the widget form (stackMultiplier: 0.5, 1, or 2)
+function setQuickAddStacks(personId, stackMultiplier) {
+    const inputEl = document.getElementById(`add-stacks-${personId}`);
+    if (inputEl) {
+        inputEl.value = stackMultiplier;
+        // Focus the input so user can see the value and optionally modify it
+        inputEl.focus();
+        inputEl.select();
+    }
+}
+
 // Confirm amount input
 function confirmAmountInput() {
     const inputEl = document.getElementById('amount-input-field');
@@ -5214,6 +5230,7 @@ window.showAddForm = showAddForm;
 window.showSubtractForm = showSubtractForm;
 window.hideForm = hideForm;
 window.submitAdd = submitAdd;
+window.setQuickAddStacks = setQuickAddStacks;
 window.submitSubtract = submitSubtract;
 window.updatePersonName = updatePersonName;
 window.updatePersonMoney = updatePersonMoney;
