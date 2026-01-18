@@ -215,12 +215,6 @@ function restoreState(parsed) {
     
     // If we have people, show tracking section
     if (state.people && state.people.length > 0) {
-        const backToHomeBtn = document.getElementById('back-to-main-btn');
-        // Show back to home button when viewing a tracker
-        if (backToHomeBtn && window.currentUser) {
-            backToHomeBtn.classList.remove('hidden');
-        }
-        
         mainScreen.classList.add('hidden');
         setupSection.classList.add('hidden');
         trackingSection.classList.remove('hidden');
@@ -363,13 +357,6 @@ async function loadUserData(userId) {
                     const trackingSection = document.getElementById('tracking-section');
                     const settingsPage = document.getElementById('settings-page');
                     const analyticsPage = document.getElementById('analytics-page');
-                    const backToHomeBtn = document.getElementById('back-to-main-btn');
-                    
-                    // Show back to home button when viewing a tracker
-                    if (backToHomeBtn && window.currentUser) {
-                        backToHomeBtn.classList.remove('hidden');
-                    }
-                    
                     // Hide all other pages with inline styles
                     if (mainScreen) {
                         mainScreen.classList.add('hidden');
@@ -519,8 +506,6 @@ async function showMainScreen() {
     const authPage = document.getElementById('auth-page');
     const analyticsPage = document.getElementById('analytics-page');
     const settingsPage = document.getElementById('settings-page');
-    const backToHomeBtn = document.getElementById('back-to-main-btn');
-    
     // IMPORTANT: Always hide setup section first when showing main screen
     if (setupSection) {
         setupSection.classList.add('hidden');
@@ -560,11 +545,6 @@ async function showMainScreen() {
             await loadLiveTables();
             // Stats are now on analytics page, no need to update here
         }
-    }
-    
-    // Hide back to home button when on main screen (you're already home!)
-    if (backToHomeBtn) {
-        backToHomeBtn.classList.add('hidden');
     }
     
     // Save viewing state (on main screen)
@@ -618,8 +598,6 @@ async function showSetupSection() {
     const trackingSection = document.getElementById('tracking-section');
     const settingsPage = document.getElementById('settings-page');
     const analyticsPage = document.getElementById('analytics-page');
-    const backToHomeBtn = document.getElementById('back-to-main-btn');
-    
     // Hide all other pages with inline styles
     if (mainScreen) {
         mainScreen.classList.add('hidden');
@@ -642,14 +620,6 @@ async function showSetupSection() {
         trackingSection.style.display = 'none';
     }
     
-    // Show back to home button when in setup (if authenticated)
-    if (backToHomeBtn) {
-        if (window.currentUser) {
-            backToHomeBtn.classList.remove('hidden');
-        } else {
-            backToHomeBtn.classList.add('hidden');
-        }
-    }
 }
 
 // Helper function to prepare state for Firestore (convert Dates to ISO strings)
@@ -1444,14 +1414,8 @@ async function startTracking() {
     }
     
     // Hide setup and main screen, show tracking
-    const backToHomeBtn = document.getElementById('back-to-main-btn');
     const settingsPage = document.getElementById('settings-page');
     const analyticsPage = document.getElementById('analytics-page');
-    
-    // Show back to home button when viewing a tracker
-    if (backToHomeBtn && window.currentUser) {
-        backToHomeBtn.classList.remove('hidden');
-    }
     
     // Hide all other pages with inline styles
     if (mainScreen) {
@@ -4040,13 +4004,6 @@ async function viewFriendTracker(friendId) {
         const trackingSection = document.getElementById('tracking-section');
         const settingsPage = document.getElementById('settings-page');
         const analyticsPage = document.getElementById('analytics-page');
-        const backToHomeBtn = document.getElementById('back-to-main-btn');
-        
-        // Show back to home button when viewing a tracker
-        if (backToHomeBtn && window.currentUser) {
-            backToHomeBtn.classList.remove('hidden');
-        }
-        
         // Hide all other pages with inline styles
         if (mainScreen) {
             mainScreen.classList.add('hidden');
@@ -4797,13 +4754,6 @@ async function loadUserTracker(trackerId) {
         const trackingSection = document.getElementById('tracking-section');
         const settingsPage = document.getElementById('settings-page');
         const analyticsPage = document.getElementById('analytics-page');
-        const backToHomeBtn = document.getElementById('back-to-main-btn');
-        
-        // Show back to home button when viewing a tracker
-        if (backToHomeBtn && window.currentUser) {
-            backToHomeBtn.classList.remove('hidden');
-        }
-        
         // Hide all other pages with inline styles for robustness
         if (mainScreen) {
             mainScreen.classList.add('hidden');
