@@ -36,6 +36,119 @@ let trackerViewState = {
     ownTrackerState: null // Store user's own tracker state when switching to friend's tracker
 };
 
+// Real-time listener for tracker updates
+let trackerRealtimeListener = null;
+
+// Clean up tracker real-time listener
+function cleanupTrackerListener() {
+    if (trackerRealtimeListener) {
+        trackerRealtimeListener();
+        trackerRealtimeListener = null;
+        console.log('Tracker real-time listener cleaned up');
+    }
+}
+
+// Set up real-time listener for own tracker
+function setupTrackerRealtimeListener(trackerId) {
+    if (!window.firebaseDb || !window.currentUser || !trackerId) {
+        return;
+    }
+    
+    // Clean up existing listener first
+    cleanupTrackerListener();
+    
+    const userId = window.currentUser.uid;
+    const docRef = window.firebaseDb.collection('users').doc(userId);
+    
+    console.log('Setting up real-time listener for tracker:', trackerId);
+    
+    trackerRealtimeListener = docRef.onSnapshot((doc) => {
+        if (!doc.exists) {
+            console.log('Tracker document does not exist');
+            return;
+        }
+        
+        const userData = doc.data();
+        const trackers = userData.trackers || [];
+        const tracker = trackers.find(t => t.id === trackerId);
+        
+        if (!tracker || !tracker.state) {
+            console.log('Tracker not found in document');
+            return;
+        }
+        
+        // Only update if we're still viewing this tracker (check to avoid stale updates)
+        if (state.trackerId === trackerId && !trackerViewState.isViewingFriendTracker) {
+            // Compare with current state to avoid unnecessary updates
+            const newState = tracker.state;
+            
+            // Always update on listener changes (Firebase only fires on actual document changes)
+            // The listener will fire for changes from other users/devices
+            console.log('Real-time update received for tracker:', trackerId);
+            restoreState(newState);
+            state.trackerId = tracker.id;
+            state.trackerName = tracker.name;
+            updateTotalPot();
+            updateChipValueDisplay();
+            updateTotalChips();
+            renderPeopleWidgets();
+            renderLog();
+        }
+    }, (error) => {
+        console.error('Error in tracker real-time listener:', error);
+    });
+}
+
+// Set up real-time listener for friend's tracker
+function setupFriendTrackerRealtimeListener(friendId, trackerId) {
+    if (!window.firebaseDb || !friendId) {
+        return;
+    }
+    
+    // Clean up existing listener first
+    cleanupTrackerListener();
+    
+    const docRef = window.firebaseDb.collection('users').doc(friendId);
+    
+    console.log('Setting up real-time listener for friend tracker:', friendId, trackerId);
+    
+    trackerRealtimeListener = docRef.onSnapshot((doc) => {
+        if (!doc.exists) {
+            console.log('Friend tracker document does not exist');
+            return;
+        }
+        
+        const userData = doc.data();
+        const trackers = userData.trackers || [];
+        const tracker = trackers.find(t => t.id === trackerId);
+        
+        if (!tracker || !tracker.state) {
+            console.log('Friend tracker not found in document');
+            return;
+        }
+        
+        // Only update if we're still viewing this friend's tracker
+        if (trackerViewState.isViewingFriendTracker && 
+            trackerViewState.viewingTrackerOwnerId === friendId &&
+            state.trackerId === trackerId) {
+            
+            // Always update on listener changes (Firebase only fires on actual document changes)
+            const newState = tracker.state;
+            console.log('Real-time update received for friend tracker:', friendId, trackerId);
+            restoreState(newState);
+            state.trackerId = tracker.id;
+            state.trackerName = tracker.name;
+            updateTotalPot();
+            updateChipValueDisplay();
+            updateTotalChips();
+            renderPeopleWidgets();
+            renderLog();
+        }
+    }, (error) => {
+        console.error('Error in friend tracker real-time listener:', error);
+    });
+}
+
 // DOM Elements
 const mainScreen = document.getElementById('main-screen');
 const setupSection = document.getElementById('setup-section');
@@ -351,6 +464,9 @@ async function loadUserData(userId) {
                     trackerViewState.viewingTrackerOwnerId = null;
                     trackerViewState.hasEditAccess = false;
                     
+                    // Set up real-time listener for own tracker
+                    setupTrackerRealtimeListener(tracker.id);
+                    
                     // Show tracking section
                     const mainScreen = document.getElementById('main-screen');
                     const setupSection = document.getElementById('setup-section');
@@ -420,6 +536,9 @@ async function loadUserData(userId) {
                     
                     // Store all trackers
                     userTrackers = data.trackers;
+                    
+                    // Set up real-time listener for own tracker
+                    setupTrackerRealtimeListener(latestTracker.id);
                     
                     // Save viewing state (viewing own tracker)
                     trackerViewState.isViewingFriendTracker = false;
@@ -493,6 +612,9 @@ async function loadUserData(userId) {
 
 // Show main screen
 async function showMainScreen() {
+    // Clean up tracker real-time listener when leaving tracker view
+    cleanupTrackerListener();
+    
     // Clear viewing state when going to main screen
     clearViewingState();
     trackerViewState.isViewingFriendTracker = false;
@@ -943,6 +1065,9 @@ async function signOut() {
     if (!window.firebaseAuth) return;
     
     try {
+        // Clean up tracker real-time listener
+        cleanupTrackerListener();
+        
         // Update online status before signing out
         if (window.currentUser && window.updateOnlineStatus) {
             await updateOnlineStatus(false);
@@ -1453,6 +1578,11 @@ async function startTracking() {
     
     // Save current state (for backward compatibility)
     await saveState();
+    
+    // Set up real-time listener for own tracker
+    if (state.trackerId) {
+        setupTrackerRealtimeListener(state.trackerId);
+    }
     
     // Reload user trackers to update "Your Tables"
     await loadUserTrackers();
@@ -3997,6 +4127,24 @@ async function viewFriendTracker(friendId) {
         
         // Restore friend's state
         restoreState(friendState);
+        
+        // Get tracker ID if available
+        let trackerId = null;
+        if (userData.trackers && userData.trackers.length > 0) {
+            const sortedTrackers = userData.trackers.sort((a, b) => {
+                const dateA = new Date(a.updatedAt || 0);
+                const dateB = new Date(b.updatedAt || 0);
+                return dateB - dateA;
+            });
+            trackerId = sortedTrackers[0].id;
+            state.trackerId = trackerId;
+            state.trackerName = sortedTrackers[0].name;
+        }
+        
+        // Set up real-time listener for friend's tracker
+        if (trackerId) {
+            setupFriendTrackerRealtimeListener(friendId, trackerId);
+        }
         
         // Hide main screen and setup, show tracking section
         const mainScreen = document.getElementById('main-screen');
