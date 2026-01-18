@@ -5825,13 +5825,16 @@ async function loadFriendLeaderboard() {
         // Sort by total PNL (descending)
         leaderboard.sort((a, b) => b.totalPNL - a.totalPNL);
         
+        // Limit to top 10 entries
+        const topLeaderboard = leaderboard.slice(0, 10);
+        
         // Render leaderboard
         if (leaderboard.length === 1 && leaderboard[0].isCurrentUser) {
             leaderboardContainer.innerHTML = '<p class="no-analytics">Add friends to see the leaderboard!</p>';
         } else if (leaderboard.length === 0) {
             leaderboardContainer.innerHTML = '<p class="no-analytics">No friends yet. Add friends to see the leaderboard!</p>';
         } else {
-            leaderboardContainer.innerHTML = leaderboard.map((entry, index) => {
+            leaderboardContainer.innerHTML = topLeaderboard.map((entry, index) => {
                 const rank = index + 1;
                 const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
                 const pnlClass = entry.totalPNL >= 0 ? 'pnl-positive' : 'pnl-negative';
@@ -5844,7 +5847,6 @@ async function loadFriendLeaderboard() {
                         <div class="leaderboard-name">${entry.name}${entry.isCurrentUser ? ' (You)' : ''}</div>
                         <div class="leaderboard-stats">
                             <span class="leaderboard-pnl ${pnlClass}">${pnlSign}$${Math.abs(entry.totalPNL).toFixed(2)}</span>
-                            <span class="leaderboard-games">${entry.gamesPlayed} game${entry.gamesPlayed !== 1 ? 's' : ''}</span>
                         </div>
                     </div>
                 `;
