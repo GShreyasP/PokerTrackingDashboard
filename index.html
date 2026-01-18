@@ -363,7 +363,8 @@
             
             <div class="form-group">
                 <label for="num-people">Number of People:</label>
-                <input type="number" id="num-people" min="1" placeholder="0">
+                <input type="number" id="num-people" min="1" max="20" placeholder="0">
+                <div id="num-people-error" class="form-error hidden" style="color: #fca5a5; font-size: 13px; margin-top: 8px;">Number of people cannot be more than 20</div>
             </div>
             
             <div class="form-group">

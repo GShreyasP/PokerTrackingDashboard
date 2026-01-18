@@ -127,6 +127,22 @@ async function getOrCreateUniqueId(userId) {
 sameValueToggle.addEventListener('change', toggleChipValueMode);
 setupBtn.addEventListener('click', startTracking);
 
+// Validate number of people input
+if (numPeopleInput) {
+    numPeopleInput.addEventListener('input', function() {
+        const numPeopleError = document.getElementById('num-people-error');
+        const value = parseInt(this.value);
+        
+        if (numPeopleError) {
+            if (value > 20) {
+                numPeopleError.classList.remove('hidden');
+            } else {
+                numPeopleError.classList.add('hidden');
+            }
+        }
+    });
+}
+
 // Load state from localStorage (fallback) or Firestore
 function loadState() {
     const savedState = localStorage.getItem('pokerTrackerState');
