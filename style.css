@@ -159,6 +159,27 @@ body:has(.auth-page:not(.hidden))::before {
         position: relative;
         min-height: 100vh;
         padding-top: 20px;
+        justify-content: flex-start;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Make header fixed on auth page for mobile */
+    body:has(.auth-page:not(.hidden)) .page-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1001;
+    }
+    
+    /* Add padding to auth-container to account for fixed header */
+    body:has(.auth-page:not(.hidden)) .auth-container {
+        margin-top: 60px;
+        max-width: 100%;
+        width: 100%;
+        padding: 24px;
+        margin-bottom: 40px;
     }
 }
 
