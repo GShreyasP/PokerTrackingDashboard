@@ -3760,13 +3760,10 @@ async function checkFriendHasTracker(friendId) {
         const userDoc = await window.firebaseDb.collection('users').doc(friendId).get();
         if (userDoc.exists) {
             const userData = userDoc.data();
-            // Check trackers array first (new format)
+            // Only check trackers array (new format) - ignore old state field
             const trackers = userData.trackers || [];
-            const activeTracker = trackers.find(t => t.state && t.state.people && t.state.people.length > 0);
-            if (activeTracker) return true;
-            
-            // Fallback to old state format for backward compatibility
-            return userData.state && userData.state.people && userData.state.people.length > 0;
+            const activeTracker = trackers.find(t => t.state && t.state.people && Array.isArray(t.state.people) && t.state.people.length > 0);
+            return !!activeTracker;
         }
     } catch (error) {
         console.error('Error checking friend tracker:', error);
@@ -4880,17 +4877,11 @@ async function loadLiveTables() {
             if (userDoc.exists) {
                 const userData = userDoc.data();
                 
-                // Check trackers array first (new format)
+                // Only check trackers array (new format) - ignore old state field
                 const trackers = userData.trackers || [];
-                let activeTracker = trackers.find(t => t.state && t.state.people && t.state.people.length > 0);
+                const activeTracker = trackers.find(t => t.state && t.state.people && Array.isArray(t.state.people) && t.state.people.length > 0);
                 
-                // Fallback to old state format for backward compatibility
-                if (!activeTracker && userData.state && userData.state.people && userData.state.people.length > 0) {
-                    // Create a temporary tracker object from old state format
-                    activeTracker = { state: userData.state };
-                }
-                
-                // Only add to live tables if there's actually an active tracker
+                // Only add to live tables if there's actually an active tracker in the trackers array
                 if (activeTracker) {
                     const friendName = userData.displayName || userData.name || userData.email || 'Unknown';
                     const hasAccess = await checkTrackerAccess(friendId);
