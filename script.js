@@ -5613,7 +5613,6 @@ function renderPNLChart(analytics) {
     let cumulativePNL = 0;
     const labels = [];
     const cumulativeData = [];
-    const perGameData = [];
     
     sortedAnalytics.forEach((game) => {
         const gameDate = game.date?.toDate ? game.date.toDate() : new Date(game.date);
@@ -5623,7 +5622,6 @@ function renderPNLChart(analytics) {
         const pnl = game.pnl || 0;
         cumulativePNL += pnl;
         cumulativeData.push(cumulativePNL);
-        perGameData.push(pnl);
     });
     
     const ctx = chartCanvas.getContext('2d');
@@ -5640,16 +5638,6 @@ function renderPNLChart(analytics) {
                     tension: 0.4,
                     fill: true,
                     borderWidth: 2
-                },
-                {
-                    label: 'Per Game PNL',
-                    data: perGameData,
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    tension: 0.4,
-                    fill: false,
-                    borderWidth: 2,
-                    borderDash: [5, 5]
                 }
             ]
         },
