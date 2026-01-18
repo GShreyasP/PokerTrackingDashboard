@@ -109,13 +109,18 @@ body:has(.auth-page:not(.hidden))::before {
     margin-bottom: 0;
     flex-wrap: wrap;
     gap: 20px;
-    position: relative;
+    position: relative !important;
     z-index: 1000;
     margin-left: calc(-50vw + 50% - 20px);
     margin-right: calc(-50vw + 50% - 20px);
     margin-top: -20px;
     width: 100vw;
     box-sizing: border-box;
+}
+
+/* Ensure header is NEVER fixed on auth page */
+body:has(.auth-page:not(.hidden)) .page-header {
+    position: relative !important;
 }
 
 .page-header.authenticated .hamburger-menu-btn {
