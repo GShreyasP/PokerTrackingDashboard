@@ -127,8 +127,9 @@ body:has(.auth-page:not(.hidden))::before {
         padding: 12px 20px;
         margin-left: calc(-50vw + 50% - 20px);
         margin-right: calc(-50vw + 50% - 20px);
-        margin-top: 0;
+        margin-top: -20px;
         width: 100vw;
+        position: relative !important;
     }
     
     /* Hide title on mobile except on auth page */
@@ -158,25 +159,16 @@ body:has(.auth-page:not(.hidden))::before {
     .auth-page {
         position: relative;
         min-height: 100vh;
-        padding-top: 20px;
+        padding-top: 0;
         padding-bottom: 40px;
         justify-content: flex-start;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
     }
     
-    /* Make header fixed on auth page for mobile */
-    body:has(.auth-page:not(.hidden)) .page-header {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        z-index: 1001;
-    }
-    
-    /* Add padding to auth-container to account for fixed header and ensure bottom content is visible */
+    /* Add padding to auth-container to ensure bottom content is visible */
     body:has(.auth-page:not(.hidden)) .auth-container {
-        margin-top: 60px;
+        margin-top: 0;
         max-width: 100%;
         width: 100%;
         padding: 24px;
