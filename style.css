@@ -3033,6 +3033,34 @@ h3 {
     border-color: #00bcd4;
 }
 
+.quick-add-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+}
+
+.btn-quick-add {
+    flex: 1;
+    min-width: 100px;
+    padding: 10px 16px;
+    background: rgba(99, 102, 241, 0.2);
+    color: #a5b4fc;
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-quick-add:hover {
+    background: rgba(99, 102, 241, 0.3);
+    border-color: rgba(99, 102, 241, 0.6);
+    color: #c7d2fe;
+    transform: translateY(-1px);
+}
+
 .custom-modal-footer {
     padding: 15px 20px;
     background: #2b2b2b;

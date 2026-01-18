@@ -1388,7 +1388,7 @@ async function startTracking() {
             // Add initial transaction (use placeholder name if name is empty)
             if (initialMoney > 0) {
                 const displayName = state.people[i].name || `Person ${i + 1}`;
-                addTransaction(i, displayName, initialMoney, 'add');
+                addTransaction(i, displayName, initialMoney, 'add', 'initial');
             }
         }
     }
@@ -1580,10 +1580,10 @@ function submitAddPerson() {
     
     state.people.push(newPerson);
     
-    // Add transaction if money > 0
+    // Add transaction if money > 0 (always initial for new person)
     if (money > 0) {
         const displayName = newPerson.name || `Person ${newPerson.id + 1}`;
-        addTransaction(newPerson.id, displayName, money, 'add');
+        addTransaction(newPerson.id, displayName, money, 'add', 'initial');
     }
     
     hideAddPersonForm();
@@ -1837,13 +1837,17 @@ function submitAdd(personId) {
         person.chips = (person.chips || 0) + chipsToAdd;
         
         // Track money put in (for balance calculation)
-        person.moneyPutIn = (person.moneyPutIn || 0) + amount;
+        const previousMoneyPutIn = person.moneyPutIn || 0;
+        person.moneyPutIn = previousMoneyPutIn + amount;
+        
+        // Determine if this is initial buy-in or re-buy
+        const transactionType = previousMoneyPutIn === 0 ? 'initial' : 're-buy';
         
         // Update total money (for display purposes, though we use balance now)
         person.totalMoney = (person.totalMoney || 0) + amount;
         
         const displayName = person.name || `Person ${personId + 1}`;
-        addTransaction(personId, displayName, amount, 'add');
+        addTransaction(personId, displayName, amount, 'add', transactionType);
         hideForm(personId);
         renderPeopleWidgets();
         updateTotalPot();
@@ -2167,13 +2171,14 @@ function updatePersonMoney(personId, newMoney) {
 }
 
 // Add transaction to log
-function addTransaction(personId, personName, amount, type) {
+function addTransaction(personId, personName, amount, type, transactionType = null) {
     const transaction = {
         id: Date.now(),
         personId: personId,
         personName: personName,
         amount: amount,
         type: type, // 'add' or 'remove'
+        transactionType: transactionType, // 'initial' or 're-buy' (only for 'add' type)
         timestamp: new Date()
     };
     
@@ -2280,7 +2285,12 @@ function renderPersonalLog(personId) {
         
         // Reverse signs: add = negative (putting money in), remove = positive (returning money)
         const sign = transaction.type === 'add' ? '-' : '+';
-        const typeText = transaction.type === 'add' ? 'added' : 'removed';
+        let typeText = transaction.type === 'add' ? 'added' : 'removed';
+        
+        // Show transaction type for buy-ins (initial vs re-buy) in personal log
+        if (transaction.type === 'add' && transaction.transactionType) {
+            typeText = transaction.transactionType === 'initial' ? 'initial buy-in' : 're-buy';
+        }
         
         logEntry.innerHTML = `
             <div class="log-time">${dateStr} ${timeStr}</div>
@@ -2334,7 +2344,12 @@ function renderLog() {
         
         // Reverse signs: add = negative (putting money in), remove = positive (returning money)
         const sign = transaction.type === 'add' ? '-' : '+';
-        const typeText = transaction.type === 'add' ? 'added' : 'removed';
+        let typeText = transaction.type === 'add' ? 'added' : 'removed';
+        
+        // Show transaction type for buy-ins (initial vs re-buy)
+        if (transaction.type === 'add' && transaction.transactionType) {
+            typeText = transaction.transactionType === 'initial' ? 'initial buy-in' : 're-buy';
+        }
         
         logEntry.innerHTML = `
             <div class="log-time">${dateStr} ${timeStr}</div>
@@ -4427,13 +4442,14 @@ async function approveJoinRequest(requestId, requesterId, moneyAmount, requester
         
         trackerState.people.push(newPerson);
         
-        // Add transaction for the new person
+        // Add transaction for the new person (always initial for new person)
         trackerState.transactions.push({
             id: Date.now(),
             personId: newPersonId,
             personName: requesterName,
             amount: moneyAmount,
             type: 'add',
+            transactionType: 'initial',
             timestamp: new Date().toISOString()
         });
         
@@ -5042,9 +5058,25 @@ function showAmountInputModal(message, callback, friendId, friendName) {
     const modal = document.getElementById('amount-input-modal');
     const messageEl = document.getElementById('amount-input-message');
     const inputEl = document.getElementById('amount-input-field');
+    const quickAddButtons = document.getElementById('quick-add-buttons');
     
     messageEl.textContent = message || 'Enter the amount of money you want to put in the tracker:';
     inputEl.value = '';
+    
+    // Show quick-add buttons if stack value is available
+    if (quickAddButtons && state.stackValue > 0) {
+        quickAddButtons.style.display = 'flex';
+        const btn50 = document.getElementById('quick-add-50');
+        const btn100 = document.getElementById('quick-add-100');
+        const btn200 = document.getElementById('quick-add-200');
+        
+        if (btn50) btn50.textContent = `50% ($${(state.stackValue * 0.5).toFixed(2)})`;
+        if (btn100) btn100.textContent = `100% ($${state.stackValue.toFixed(2)})`;
+        if (btn200) btn200.textContent = `200% ($${(state.stackValue * 2).toFixed(2)})`;
+    } else if (quickAddButtons) {
+        quickAddButtons.style.display = 'none';
+    }
+    
     modal.classList.remove('hidden');
     
     // Focus input and select all text
@@ -5074,6 +5106,21 @@ function closeAmountInputModal() {
     if (amountInputKeyHandler) {
         document.removeEventListener('keydown', amountInputKeyHandler);
         amountInputKeyHandler = null;
+    }
+}
+
+// Use quick-add button (multiplier: 0.5 for 50%, 1 for 100%, 2 for 200%)
+function useQuickAdd(multiplier) {
+    if (state.stackValue > 0) {
+        const amount = state.stackValue * multiplier;
+        const inputEl = document.getElementById('amount-input-field');
+        if (inputEl) {
+            inputEl.value = amount.toFixed(2);
+            // Auto-confirm after a short delay to allow user to see the value
+            setTimeout(() => {
+                confirmAmountInput();
+            }, 100);
+        }
     }
 }
 
@@ -5227,6 +5274,7 @@ window.grantFriendEditAccess = grantFriendEditAccess;
 window.showJoinTrackerModal = showJoinTrackerModal;
 window.closeAmountInputModal = closeAmountInputModal;
 window.confirmAmountInput = confirmAmountInput;
+window.useQuickAdd = useQuickAdd;
 window.closeAlertModal = closeAlertModal;
 window.requestJoinTracker = requestJoinTracker;
 window.loadLiveTables = loadLiveTables;
