@@ -5557,6 +5557,7 @@ async function loadAnalytics() {
         if (!userDoc.exists) {
             // No analytics data yet
             displayAnalytics([]);
+            await loadFriendLeaderboard();
             return;
         }
         
@@ -5567,11 +5568,17 @@ async function loadAnalytics() {
         
         // Update stats cards on analytics page (Total Tables, Active Sessions, etc.)
         updateStats();
+        
+        // Load friend leaderboard
+        await loadFriendLeaderboard();
     } catch (error) {
         console.error('Error loading analytics:', error);
         showAlertModal('Error loading analytics. Please try again.');
     }
 }
+
+// Global chart instance
+let pnlChartInstance = null;
 
 function displayAnalytics(analytics) {
     // Calculate totals
@@ -5595,6 +5602,9 @@ function displayAnalytics(analytics) {
         avgPNLElement.textContent = `${avgPNL >= 0 ? '+' : ''}$${avgPNL.toFixed(2)}`;
         avgPNLElement.className = `stat-value ${avgPNL >= 0 ? 'pnl-positive' : 'pnl-negative'}`;
     }
+    
+    // Render PNL over time chart
+    renderPNLChart(analytics);
     
     // Display history
     const historyList = document.getElementById('analytics-history-list');
@@ -5629,6 +5639,220 @@ function displayAnalytics(analytics) {
                 `;
             }).join('');
         }
+    }
+}
+
+// Render PNL over time chart
+function renderPNLChart(analytics) {
+    const chartCanvas = document.getElementById('pnl-chart');
+    if (!chartCanvas || typeof Chart === 'undefined') {
+        console.error('Chart.js not loaded or canvas element not found');
+        return;
+    }
+    
+    // Destroy existing chart if it exists
+    if (pnlChartInstance) {
+        pnlChartInstance.destroy();
+        pnlChartInstance = null;
+    }
+    
+    if (analytics.length === 0) {
+        chartCanvas.parentElement.innerHTML = '<p class="no-analytics">No data available. Start playing games to see your PNL over time.</p>';
+        return;
+    }
+    
+    // Sort analytics by date (oldest first for cumulative line)
+    const sortedAnalytics = [...analytics].sort((a, b) => {
+        const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+        const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+        return dateA - dateB;
+    });
+    
+    // Calculate cumulative PNL and extract labels/dates
+    let cumulativePNL = 0;
+    const labels = [];
+    const cumulativeData = [];
+    const perGameData = [];
+    
+    sortedAnalytics.forEach((game) => {
+        const gameDate = game.date?.toDate ? game.date.toDate() : new Date(game.date);
+        const dateStr = gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        labels.push(dateStr);
+        
+        const pnl = game.pnl || 0;
+        cumulativePNL += pnl;
+        cumulativeData.push(cumulativePNL);
+        perGameData.push(pnl);
+    });
+    
+    const ctx = chartCanvas.getContext('2d');
+    pnlChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Cumulative PNL',
+                    data: cumulativeData,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    borderWidth: 2
+                },
+                {
+                    label: 'Per Game PNL',
+                    data: perGameData,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    tension: 0.4,
+                    fill: false,
+                    borderWidth: 2,
+                    borderDash: [5, 5]
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        color: '#e5e7eb',
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.parsed.y;
+                            return context.dataset.label + ': ' + (value >= 0 ? '+' : '') + '$' + value.toFixed(2);
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        color: '#9ca3af',
+                        maxRotation: 45,
+                        minRotation: 45
+                    },
+                    grid: {
+                        color: 'rgba(156, 163, 175, 0.2)'
+                    }
+                },
+                y: {
+                    ticks: {
+                        color: '#9ca3af',
+                        callback: function(value) {
+                            return (value >= 0 ? '+' : '') + '$' + value.toFixed(0);
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(156, 163, 175, 0.2)'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Load friend leaderboard
+async function loadFriendLeaderboard() {
+    const leaderboardContainer = document.getElementById('friend-leaderboard');
+    if (!leaderboardContainer || !window.firebaseDb || !window.currentUser) {
+        return;
+    }
+    
+    try {
+        const currentUserId = window.currentUser.uid;
+        
+        // Get all friends
+        const friendsRef = window.firebaseDb.collection('friends');
+        const snapshot1 = await friendsRef.where('user1', '==', currentUserId).get();
+        const snapshot2 = await friendsRef.where('user2', '==', currentUserId).get();
+        
+        const friendIds = new Set();
+        snapshot1.forEach(doc => friendIds.add(doc.data().user2));
+        snapshot2.forEach(doc => friendIds.add(doc.data().user1));
+        
+        // Get current user's analytics
+        const currentUserDoc = await window.firebaseDb.collection('users').doc(currentUserId).get();
+        const currentUserData = currentUserDoc.exists ? currentUserDoc.data() : {};
+        const currentUserAnalytics = currentUserData.analytics || [];
+        const currentUserTotalPNL = currentUserAnalytics.reduce((sum, game) => sum + (game.pnl || 0), 0);
+        const currentUserName = currentUserData.displayName || currentUserData.name || currentUserData.email || 'You';
+        
+        // Create leaderboard entries
+        const leaderboard = [{
+            name: currentUserName,
+            userId: currentUserId,
+            totalPNL: currentUserTotalPNL,
+            gamesPlayed: currentUserAnalytics.length,
+            isCurrentUser: true
+        }];
+        
+        // Get friend analytics
+        for (const friendId of friendIds) {
+            try {
+                const friendDoc = await window.firebaseDb.collection('users').doc(friendId).get();
+                if (friendDoc.exists) {
+                    const friendData = friendDoc.data();
+                    const friendAnalytics = friendData.analytics || [];
+                    const friendTotalPNL = friendAnalytics.reduce((sum, game) => sum + (game.pnl || 0), 0);
+                    const friendName = friendData.displayName || friendData.name || friendData.email || 'Unknown';
+                    
+                    leaderboard.push({
+                        name: friendName,
+                        userId: friendId,
+                        totalPNL: friendTotalPNL,
+                        gamesPlayed: friendAnalytics.length,
+                        isCurrentUser: false
+                    });
+                }
+            } catch (error) {
+                console.error(`Error loading analytics for friend ${friendId}:`, error);
+            }
+        }
+        
+        // Sort by total PNL (descending)
+        leaderboard.sort((a, b) => b.totalPNL - a.totalPNL);
+        
+        // Render leaderboard
+        if (leaderboard.length === 1 && leaderboard[0].isCurrentUser) {
+            leaderboardContainer.innerHTML = '<p class="no-analytics">Add friends to see the leaderboard!</p>';
+        } else if (leaderboard.length === 0) {
+            leaderboardContainer.innerHTML = '<p class="no-analytics">No friends yet. Add friends to see the leaderboard!</p>';
+        } else {
+            leaderboardContainer.innerHTML = leaderboard.map((entry, index) => {
+                const rank = index + 1;
+                const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
+                const pnlClass = entry.totalPNL >= 0 ? 'pnl-positive' : 'pnl-negative';
+                const pnlSign = entry.totalPNL >= 0 ? '+' : '';
+                const currentUserClass = entry.isCurrentUser ? 'leaderboard-entry-current' : '';
+                
+                return `
+                    <div class="leaderboard-entry ${currentUserClass}">
+                        <div class="leaderboard-rank">${medal}</div>
+                        <div class="leaderboard-name">${entry.name}${entry.isCurrentUser ? ' (You)' : ''}</div>
+                        <div class="leaderboard-stats">
+                            <span class="leaderboard-pnl ${pnlClass}">${pnlSign}$${Math.abs(entry.totalPNL).toFixed(2)}</span>
+                            <span class="leaderboard-games">${entry.gamesPlayed} game${entry.gamesPlayed !== 1 ? 's' : ''}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    } catch (error) {
+        console.error('Error loading friend leaderboard:', error);
+        leaderboardContainer.innerHTML = '<p class="no-analytics">Error loading leaderboard. Please try again.</p>';
     }
 }
 

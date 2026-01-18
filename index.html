@@ -12,6 +12,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="/firebase-init.js"></script>
+    <!-- Chart.js for analytics visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -343,6 +345,20 @@
                     <div class="stat-card">
                         <div class="stat-label">Average PNL per Game</div>
                         <div id="avg-pnl" class="stat-value">$0.00</div>
+                    </div>
+                </div>
+                <!-- PNL Over Time Chart -->
+                <div class="analytics-chart-section">
+                    <h3>PNL Over Time</h3>
+                    <div class="chart-container">
+                        <canvas id="pnl-chart"></canvas>
+                    </div>
+                </div>
+                <!-- Friend Leaderboard -->
+                <div class="analytics-leaderboard-section">
+                    <h3>Friend Leaderboard</h3>
+                    <div id="friend-leaderboard" class="leaderboard-container">
+                        <p class="no-analytics">Loading leaderboard...</p>
                     </div>
                 </div>
                 <div class="analytics-history">
