@@ -2772,12 +2772,17 @@ function showSettingsModal() {
 function toggleFriendsSidebar() {
     const sidebar = document.getElementById('friends-sidebar');
     const overlay = document.getElementById('sidebar-overlay');
+    const pageHeader = document.querySelector('.page-header');
 
     if (sidebar && overlay) {
         const isHidden = sidebar.classList.contains('hidden');
         if (isHidden) {
             sidebar.classList.remove('hidden');
             overlay.classList.remove('hidden');
+            // Hide header when sidebar opens
+            if (pageHeader) {
+                pageHeader.classList.add('hidden');
+            }
             loadFriendsList();
             loadFriendRequests();
             loadTrackerAccessRequests();
@@ -2785,6 +2790,10 @@ function toggleFriendsSidebar() {
         } else {
             sidebar.classList.add('hidden');
             overlay.classList.add('hidden');
+            // Show header when sidebar closes
+            if (pageHeader) {
+                pageHeader.classList.remove('hidden');
+            }
             // Clean up tracker join requests listener when sidebar is closed
             if (window.trackerJoinRequestsListener) {
                 window.trackerJoinRequestsListener();
