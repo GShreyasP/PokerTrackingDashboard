@@ -131,6 +131,14 @@ body:has(.auth-page:not(.hidden))::before {
         width: 100vw;
     }
     
+    .page-header h1 {
+        display: none;
+    }
+    
+    .header-user-info {
+        display: none !important;
+    }
+    
     .hamburger-menu-btn {
         display: flex !important;
     }
