@@ -159,6 +159,7 @@ body:has(.auth-page:not(.hidden))::before {
         position: relative;
         min-height: 100vh;
         padding-top: 20px;
+        padding-bottom: 40px;
         justify-content: flex-start;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
@@ -173,13 +174,14 @@ body:has(.auth-page:not(.hidden))::before {
         z-index: 1001;
     }
     
-    /* Add padding to auth-container to account for fixed header */
+    /* Add padding to auth-container to account for fixed header and ensure bottom content is visible */
     body:has(.auth-page:not(.hidden)) .auth-container {
         margin-top: 60px;
         max-width: 100%;
         width: 100%;
         padding: 24px;
-        margin-bottom: 40px;
+        padding-bottom: 40px;
+        margin-bottom: 60px;
     }
 }
 
