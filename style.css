@@ -3279,7 +3279,16 @@ h3 {
     border: 1px solid rgba(148, 163, 184, 0.1);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     position: relative;
+    min-height: 400px;
     height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-container canvas {
+    max-height: 100%;
+    width: 100% !important;
+    height: auto !important;
 }
 
 /* Leaderboard Section */
