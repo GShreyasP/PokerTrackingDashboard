@@ -141,12 +141,24 @@ body:has(.auth-page:not(.hidden))::before {
         display: block;
     }
     
+    /* Hide hamburger menu button on auth page for mobile */
+    body:has(.auth-page:not(.hidden)) .hamburger-menu-btn {
+        display: none !important;
+    }
+    
     .header-user-info {
         display: none !important;
     }
     
     .hamburger-menu-btn {
         display: flex !important;
+    }
+    
+    /* Allow auth page to scroll on mobile by changing from fixed to relative */
+    .auth-page {
+        position: relative;
+        min-height: 100vh;
+        padding-top: 20px;
     }
 }
 
