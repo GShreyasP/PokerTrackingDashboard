@@ -691,15 +691,13 @@ async function isEmailWhitelisted(email) {
     
     try {
         // Check whitelist via serverless function (secure, server-side)
-        // Pass authentication info for security
         const response = await fetch('/api/whop-check-subscription', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
-                email: email,
-                checkWhitelistOnly: true 
+                email: email
             })
         });
         

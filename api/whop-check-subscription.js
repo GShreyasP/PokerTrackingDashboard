@@ -29,16 +29,6 @@ export default async function handler(req, res) {
     const whitelistEnv = process.env.PRO_PLAN_WHITELIST || '';
     const whitelist = whitelistEnv.split(',').map(e => e.trim().toLowerCase()).filter(e => e);
     
-    // If only checking whitelist, return early
-    if (req.body.checkWhitelistOnly) {
-      return res.status(200).json({
-        hasSubscription: whitelist.includes(authenticatedEmail),
-        subscriptionType: whitelist.includes(authenticatedEmail) ? 'pro' : null,
-        expiresAt: null,
-        isWhitelisted: whitelist.includes(authenticatedEmail)
-      });
-    }
-    
     // If whitelisted, return Pro plan status without checking Whop
     if (whitelist.includes(authenticatedEmail)) {
       return res.status(200).json({
