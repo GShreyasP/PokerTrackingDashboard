@@ -3959,48 +3959,56 @@ h3 {
     }
 }
 
+/* Header Title Section */
+.header-title-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
 /* Plan Badge in Header */
 .plan-badge {
     display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 5px 12px;
-    border-radius: 16px;
-    margin-left: 10px;
-    vertical-align: middle;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 12px;
     text-transform: uppercase;
-    letter-spacing: 0.8px;
-    line-height: 1.2;
+    letter-spacing: 0.5px;
+    line-height: 1.4;
+    color: #ffffff;
 }
 
 .plan-badge:not(.hidden) {
     display: inline-block;
 }
 
-.page-header h1 .plan-badge {
-    font-size: 10px;
-    padding: 4px 10px;
-    margin-left: 8px;
-}
-
-/* Plan Badge Colors - High Contrast */
+/* Plan Badge Colors - White Text */
 .plan-badge[data-plan="free"] {
-    background: rgba(30, 41, 59, 0.9);
-    color: #cbd5e1;
-    border: 1px solid rgba(148, 163, 184, 0.4);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    background: rgba(148, 163, 184, 0.3);
+    border: 1px solid rgba(148, 163, 184, 0.5);
 }
 
 .plan-badge[data-plan="pro"] {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: #ffffff;
     border: 1px solid rgba(102, 126, 234, 0.5);
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
 }
 
 .plan-badge[data-plan="payp"] {
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: #ffffff;
     border: 1px solid rgba(16, 185, 129, 0.5);
-    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+}
+
+@media (max-width: 768px) {
+    .header-title-section {
+        gap: 3px;
+    }
+    
+    .plan-badge {
+        font-size: 9px;
+        padding: 2px 8px;
+    }
 }
