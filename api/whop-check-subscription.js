@@ -223,12 +223,11 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Whop API not configured' });
     }
     
-    // APPROACH: Check memberships first (they have email), then match payments by membership ID
-    let userMembershipIds = [];
+    // APPROACH: Match payments by email from memberships, then check payment amount
     let userPayments = [];
     
     try {
-      // Step 1: Find user's memberships by email (memberships have email, payments don't)
+      // Step 1: Get all memberships to find emails
       const membershipsResponse = await fetch(`https://api.whop.com/api/v2/memberships`, {
         method: 'GET',
         headers: {
@@ -237,30 +236,32 @@ export default async function handler(req, res) {
         }
       });
       
+      let userEmails = [authenticatedEmail]; // Start with the provided email
+      
       if (membershipsResponse.ok) {
         const membershipsData = await membershipsResponse.json();
         const allMemberships = Array.isArray(membershipsData) 
           ? membershipsData 
           : (Array.isArray(membershipsData.data) ? membershipsData.data : []);
         
-        // Find memberships matching this email
-        const userMemberships = allMemberships.filter(membership => {
+        // Find all emails from memberships that match this user (handle variations)
+        const authUsername = authenticatedEmail.split('@')[0];
+        allMemberships.forEach(membership => {
           const memEmail = (membership.email || membership.user?.email || membership.member?.email || '').toLowerCase().trim();
-          const authUsername = authenticatedEmail.split('@')[0];
           const memUsername = memEmail.split('@')[0];
           
-          // Exact match or username match (handles typos)
-          return memEmail === authenticatedEmail || authUsername === memUsername;
+          // If email matches (exact or username), add it to the list
+          if (memEmail === authenticatedEmail || authUsername === memUsername) {
+            if (!userEmails.includes(memEmail)) {
+              userEmails.push(memEmail);
+            }
+          }
         });
         
-        // Extract membership IDs
-        userMembershipIds = userMemberships.map(m => m.id).filter(Boolean);
-        
-        console.log(`Found ${userMemberships.length} memberships for ${authenticatedEmail}`);
-        console.log(`Membership IDs:`, userMembershipIds);
+        console.log(`Found ${userEmails.length} email(s) for user:`, userEmails);
       }
       
-      // Step 2: Fetch all payments and match by membership ID
+      // Step 2: Fetch all payments and match by email from memberships
       let page = 1;
       let hasMorePages = true;
       
@@ -291,13 +292,37 @@ export default async function handler(req, res) {
           pagePayments = paymentsData.payments;
         }
         
-        // Filter payments by membership ID
-        const matchingPayments = pagePayments.filter(payment => {
+        // For each payment, check if it belongs to a membership with matching email
+        // We need to look up the membership for each payment to get the email
+        for (const payment of pagePayments) {
           const paymentMembershipId = payment.membership_id || payment.membership?.id;
-          return paymentMembershipId && userMembershipIds.includes(paymentMembershipId);
-        });
-        
-        userPayments = [...userPayments, ...matchingPayments];
+          
+          if (paymentMembershipId) {
+            // Fetch the membership to get the email
+            try {
+              const membershipResponse = await fetch(`https://api.whop.com/api/v2/memberships/${paymentMembershipId}`, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${whopApiKey}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              if (membershipResponse.ok) {
+                const membership = await membershipResponse.json();
+                const memEmail = (membership.email || membership.user?.email || membership.member?.email || '').toLowerCase().trim();
+                
+                // Check if this membership's email matches our user
+                if (userEmails.includes(memEmail)) {
+                  userPayments.push(payment);
+                }
+              }
+            } catch (err) {
+              // Skip if we can't fetch membership
+              console.warn(`Could not fetch membership ${paymentMembershipId} for payment ${payment.id}`);
+            }
+          }
+        }
         
         // Check if there are more pages
         const meta = paymentsData.meta || {};
@@ -309,7 +334,7 @@ export default async function handler(req, res) {
         if (page > 10) break;
       }
       
-      console.log(`Found ${userPayments.length} payments for ${authenticatedEmail} (matched by membership IDs)`);
+      console.log(`Found ${userPayments.length} payments for ${authenticatedEmail} (matched by email from memberships)`);
       
     } catch (error) {
       console.error('Error fetching memberships/payments:', error);
