@@ -1161,7 +1161,7 @@ async function canCreateTracker() {
         // Check if user is whitelisted first (async)
         const whitelisted = await isEmailWhitelisted(userEmail);
         if (whitelisted) {
-            return { canCreate: true, subscriptionType: 'pro', isWhitelisted: true };
+            return { canCreate: true, subscriptionType: 'pro', isWhitelisted: true, hasUnlimitedCredits: true };
         }
         
         const userRef = window.firebaseDb.collection('users').doc(userId);
@@ -1174,7 +1174,45 @@ async function canCreateTracker() {
         const userData = userDoc.data();
         const trackers = userData.trackers || [];
         
-        // Check credits for ALL users (universal credit system)
+        // Check subscription status to see if user has Pro plan (unlimited credits)
+        let subscriptionStatus = await getSubscriptionStatus(userId, userEmail);
+        
+        // If subscription status is old (more than 1 hour), refresh it
+        const lastChecked = subscriptionStatus?.lastChecked;
+        const shouldRefresh = !subscriptionStatus?.isWhitelisted && (!lastChecked || 
+            (lastChecked.toDate && new Date() - lastChecked.toDate() > 3600000)); // 1 hour
+        
+        if (shouldRefresh) {
+            subscriptionStatus = await refreshSubscriptionStatus();
+        }
+        
+        // Check if user has Pro plan (monthly or 6-month subscription)
+        const hasProPlan = subscriptionStatus?.hasSubscription && 
+                           (subscriptionStatus?.subscriptionType === 'monthly' || 
+                            subscriptionStatus?.subscriptionType === '6month' ||
+                            subscriptionStatus?.subscriptionType === 'pro') &&
+                           !subscriptionStatus?.isOneTimePayment;
+        
+        // Check if subscription is expired
+        let isSubscriptionActive = hasProPlan;
+        if (hasProPlan && subscriptionStatus?.expiresAt) {
+            const expiresAt = new Date(subscriptionStatus.expiresAt);
+            isSubscriptionActive = expiresAt > new Date();
+        }
+        
+        // Pro plan users have unlimited credits - skip credit check
+        if (isSubscriptionActive || whitelisted) {
+            // Active limit: 2 active trackers max for all users (DDoS protection)
+            if (trackers.length >= 2) {
+                return { 
+                    canCreate: false, 
+                    reason: 'You can only have 2 active tables at once. Delete a table to create a new one.' 
+                };
+            }
+            return { canCreate: true, hasUnlimitedCredits: true };
+        }
+        
+        // For non-Pro users, check credits
         const credits = userData.credits !== undefined ? userData.credits : 3; // Default to 3 if not set
         if (credits <= 0) {
             return {
@@ -1227,19 +1265,21 @@ async function showSetupSection() {
         return;
     }
     
-    // Show confirmation for all users with credits (universal credit system)
-    const userId = window.currentUser.uid;
-    await initializeCredits(userId);
-    
-    const userRef = window.firebaseDb.collection('users').doc(userId);
-    const userDoc = await userRef.get();
-    const userData = userDoc.exists ? userDoc.data() : {};
-    const credits = userData.credits !== undefined ? userData.credits : 3;
-    
-    if (credits > 0) {
-        // Show confirmation modal for all users
-        showConfirmModal(credits);
-        return; // Don't proceed yet, wait for confirmation
+    // Show confirmation for users with credits (skip for Pro plan users with unlimited)
+    if (!canCreate.hasUnlimitedCredits) {
+        const userId = window.currentUser.uid;
+        await initializeCredits(userId);
+        
+        const userRef = window.firebaseDb.collection('users').doc(userId);
+        const userDoc = await userRef.get();
+        const userData = userDoc.exists ? userDoc.data() : {};
+        const credits = userData.credits !== undefined ? userData.credits : 3;
+        
+        if (credits > 0) {
+            // Show confirmation modal for users with limited credits
+            showConfirmModal(credits);
+            return; // Don't proceed yet, wait for confirmation
+        }
     }
     
     // Hide error message if visible
@@ -3551,6 +3591,7 @@ async function loadSettingsData() {
     
     try {
         const userId = window.currentUser.uid;
+        const userEmail = window.currentUser.email;
         // Initialize credits if needed
         await initializeCredits(userId);
         
@@ -3560,6 +3601,24 @@ async function loadSettingsData() {
         const usernameInput = document.getElementById('settings-username');
         const uniqueIdInput = document.getElementById('settings-unique-id');
         const creditsDisplay = document.getElementById('settings-credits-display');
+        
+        // Check if user has Pro plan (unlimited credits)
+        const subscriptionStatus = await getSubscriptionStatus(userId, userEmail);
+        const whitelisted = await isEmailWhitelisted(userEmail);
+        
+        const hasProPlan = whitelisted || 
+                          (subscriptionStatus?.hasSubscription && 
+                           (subscriptionStatus?.subscriptionType === 'monthly' || 
+                            subscriptionStatus?.subscriptionType === '6month' ||
+                            subscriptionStatus?.subscriptionType === 'pro') &&
+                           !subscriptionStatus?.isOneTimePayment);
+        
+        // Check if subscription is active (not expired)
+        let isSubscriptionActive = hasProPlan;
+        if (hasProPlan && subscriptionStatus?.expiresAt) {
+            const expiresAt = new Date(subscriptionStatus.expiresAt);
+            isSubscriptionActive = expiresAt > new Date();
+        }
         
         if (userDoc.exists) {
             const userData = userDoc.data();
@@ -3574,19 +3633,31 @@ async function loadSettingsData() {
                 uniqueIdInput.value = userData.uniqueId || '';
             }
             
-            // Load and display credits
+            // Load and display credits (or "Unlimited" for Pro plan users)
             if (creditsDisplay) {
-                const credits = userData.credits !== undefined ? userData.credits : 3;
-                creditsDisplay.textContent = credits;
+                if (isSubscriptionActive || whitelisted) {
+                    creditsDisplay.textContent = 'Unlimited';
+                    creditsDisplay.style.color = '#10b981'; // Green for unlimited
+                } else {
+                    const credits = userData.credits !== undefined ? userData.credits : 3;
+                    creditsDisplay.textContent = credits;
+                    creditsDisplay.style.color = '#10b981'; // Green for regular credits
+                }
             }
         } else {
             // If no user doc exists, use auth data
             if (usernameInput) {
                 usernameInput.value = window.currentUser.displayName || window.currentUser.email || '';
             }
-            // Show default credits
+            // Show default credits or unlimited
             if (creditsDisplay) {
-                creditsDisplay.textContent = '3';
+                if (isSubscriptionActive || whitelisted) {
+                    creditsDisplay.textContent = 'Unlimited';
+                    creditsDisplay.style.color = '#10b981';
+                } else {
+                    creditsDisplay.textContent = '3';
+                    creditsDisplay.style.color = '#10b981';
+                }
             }
         }
     } catch (error) {
@@ -6140,31 +6211,56 @@ function closeConfirmModal() {
 async function confirmCreateTracker() {
     closeConfirmModal();
     
-    // Decrement universal credits for all users
+    // Decrement universal credits for non-Pro users only
     if (window.currentUser && window.firebaseDb) {
         try {
             const userId = window.currentUser.uid;
-            await initializeCredits(userId); // Ensure credits exist
+            const userEmail = window.currentUser.email;
             
-            const userRef = window.firebaseDb.collection('users').doc(userId);
-            const userDoc = await userRef.get();
+            // Check if user has Pro plan (unlimited credits)
+            const subscriptionStatus = await getSubscriptionStatus(userId, userEmail);
+            const whitelisted = await isEmailWhitelisted(userEmail);
             
-            if (userDoc.exists) {
-                const userData = userDoc.data();
-                const currentCredits = userData.credits !== undefined ? userData.credits : 3;
-                const newCredits = Math.max(0, currentCredits - 1);
+            const hasProPlan = whitelisted || 
+                              (subscriptionStatus?.hasSubscription && 
+                               (subscriptionStatus?.subscriptionType === 'monthly' || 
+                                subscriptionStatus?.subscriptionType === '6month' ||
+                                subscriptionStatus?.subscriptionType === 'pro') &&
+                               !subscriptionStatus?.isOneTimePayment);
+            
+            // Check if subscription is active (not expired)
+            let isSubscriptionActive = hasProPlan;
+            if (hasProPlan && subscriptionStatus?.expiresAt) {
+                const expiresAt = new Date(subscriptionStatus.expiresAt);
+                isSubscriptionActive = expiresAt > new Date();
+            }
+            
+            // Only decrement credits if user doesn't have unlimited (Pro plan)
+            if (!isSubscriptionActive && !whitelisted) {
+                await initializeCredits(userId); // Ensure credits exist
                 
-                await userRef.set({
-                    credits: newCredits
-                }, { merge: true });
+                const userRef = window.firebaseDb.collection('users').doc(userId);
+                const userDoc = await userRef.get();
                 
-                console.log(`Credit used. Remaining credits: ${newCredits}`);
-                
-                // Update credits display in settings if visible
-                const creditsDisplay = document.getElementById('settings-credits-display');
-                if (creditsDisplay) {
-                    creditsDisplay.textContent = newCredits;
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    const currentCredits = userData.credits !== undefined ? userData.credits : 3;
+                    const newCredits = Math.max(0, currentCredits - 1);
+                    
+                    await userRef.set({
+                        credits: newCredits
+                    }, { merge: true });
+                    
+                    console.log(`Credit used. Remaining credits: ${newCredits}`);
+                    
+                    // Update credits display in settings if visible
+                    const creditsDisplay = document.getElementById('settings-credits-display');
+                    if (creditsDisplay) {
+                        creditsDisplay.textContent = newCredits;
+                    }
                 }
+            } else {
+                console.log('Pro plan user - no credit decremented (unlimited)');
             }
         } catch (error) {
             console.error('Error decrementing credit:', error);
