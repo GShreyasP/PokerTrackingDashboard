@@ -832,13 +832,24 @@ async function updateSubscriptionStatus(userId, subscriptionData) {
 }
 
 // Sync credits based on PAYP payment count
-async function syncPaypCredits(userId, paypPaymentCount) {
+async function syncPaypCredits(userId, paypPaymentCount, debugInfo = null) {
     if (!window.firebaseDb || !userId) {
+        console.error('syncPaypCredits: Missing firebaseDb or userId');
         return;
+    }
+    
+    // Log debug info if provided
+    if (debugInfo) {
+        console.log('=== SYNC PAYP CREDITS DEBUG ===');
+        console.log('User ID:', userId);
+        console.log('PAYP Payment Count:', paypPaymentCount);
+        console.log('Debug Info from API:', JSON.stringify(debugInfo, null, 2));
+        console.log('================================');
     }
     
     // If no payment count provided, return (don't sync)
     if (!paypPaymentCount || paypPaymentCount === 0) {
+        console.log('syncPaypCredits: No payment count provided or count is 0');
         return;
     }
     
@@ -858,6 +869,14 @@ async function syncPaypCredits(userId, paypPaymentCount) {
             const expectedCreditsFromPayp = paypPaymentCount;
             const creditsToAdd = expectedCreditsFromPayp - creditsFromPayp;
             
+            console.log('Credit Sync Calculation:', {
+                currentCredits,
+                creditsFromPayp,
+                expectedCreditsFromPayp,
+                creditsToAdd,
+                paypPaymentCount
+            });
+            
             if (creditsToAdd > 0) {
                 const newCredits = currentCredits + creditsToAdd;
                 const newCreditsFromPayp = expectedCreditsFromPayp;
@@ -867,7 +886,7 @@ async function syncPaypCredits(userId, paypPaymentCount) {
                     creditsFromPayp: newCreditsFromPayp
                 }, { merge: true });
                 
-                console.log(`PAYP credits synced. Added ${creditsToAdd} credit(s). Total credits: ${newCredits} (${newCreditsFromPayp} from PAYP)`);
+                console.log(`✅ PAYP credits synced. Added ${creditsToAdd} credit(s). Total credits: ${newCredits} (${newCreditsFromPayp} from PAYP)`);
                 
                 // Update credits display in settings if visible
                 const creditsDisplay = document.getElementById('settings-credits-display');
@@ -877,8 +896,10 @@ async function syncPaypCredits(userId, paypPaymentCount) {
                 
                 return { added: creditsToAdd, total: newCredits };
             } else {
-                console.log(`PAYP credits already synced. Current: ${currentCredits}, Expected from PAYP: ${expectedCreditsFromPayp}, Already have: ${creditsFromPayp}`);
+                console.log(`ℹ️ PAYP credits already synced. Current: ${currentCredits}, Expected from PAYP: ${expectedCreditsFromPayp}, Already have: ${creditsFromPayp}`);
             }
+        } else {
+            console.error('syncPaypCredits: User document does not exist');
         }
     } catch (error) {
         console.error('Error syncing PAYP credits:', error);
@@ -905,29 +926,43 @@ async function refreshCredits() {
             refreshBtn.textContent = 'Refreshing...';
         }
         
+        console.log('=== MANUAL CREDIT REFRESH ===');
+        console.log('User ID:', userId);
+        console.log('User Email:', userEmail);
+        
         // Refresh subscription status (this will sync credits)
         const subscriptionData = await refreshSubscriptionStatus();
         
+        console.log('Subscription Data Received:', JSON.stringify(subscriptionData, null, 2));
+        
         if (subscriptionData && (subscriptionData.subscriptionType === 'payp' || subscriptionData.isOneTimePayment)) {
             const paypPaymentCount = subscriptionData.paypPaymentCount || 0;
+            const debugInfo = subscriptionData.debug || null;
+            
+            console.log('PAYP Payment Count:', paypPaymentCount);
+            console.log('Debug Info:', JSON.stringify(debugInfo, null, 2));
+            
             if (paypPaymentCount > 0) {
-                const result = await syncPaypCredits(userId, paypPaymentCount);
+                const result = await syncPaypCredits(userId, paypPaymentCount, debugInfo);
                 if (result && result.added > 0) {
                     showAlertModal(`Credits refreshed! Added ${result.added} credit(s). You now have ${result.total} credits.`);
+                    // Reload settings to update display
+                    await loadSettingsData();
                 } else {
                     showAlertModal('Credits are up to date. No changes needed.');
                 }
             } else {
-                showAlertModal('No PAYP payments found. If you just made a payment, please wait a moment and try again.');
+                const debugMsg = debugInfo ? `\n\nDebug: Found ${debugInfo.totalPaymentsFound} total payments. Matched: ${debugInfo.matchedPayments?.length || 0}` : '';
+                showAlertModal(`No PAYP payments found. If you just made a payment, please wait a moment and try again.${debugMsg}\n\nCheck browser console for detailed logs.`);
             }
         } else {
             // Reload settings to update display
             await loadSettingsData();
-            showAlertModal('Credits refreshed!');
+            showAlertModal('Credits refreshed! (Not a PAYP user)');
         }
     } catch (error) {
         console.error('Error refreshing credits:', error);
-        showAlertModal('Error refreshing credits. Please try again.');
+        showAlertModal(`Error refreshing credits: ${error.message}. Check browser console for details.`);
     } finally {
         // Restore button state
         const refreshBtn = document.getElementById('refresh-credits-btn');

@@ -276,58 +276,112 @@ export default async function handler(req, res) {
     }
     
     // Log for debugging (remove in production or make conditional)
-    console.log('Whop membership check:', {
-      authenticatedEmail,
-      membershipFound: !!matchingMembership,
-      paymentFound: !!matchingPayment,
-      membershipEmail: matchingMembership?.email || matchingMembership?.user?.email || matchingMembership?.member?.email,
-      paymentEmail: matchingPayment?.user?.email || matchingPayment?.email,
-      planPrice,
-      normalizedPrice,
-      reason,
-      planName: matchingMembership.plan?.name,
-      planId: matchingMembership.plan?.id,
-      isPaypByPriceAndReason,
-      isOneDollar,
-      subscriptionType,
-      isOneTimePayment,
-      membershipStatus: matchingMembership?.status,
-      membershipData: JSON.stringify(matchingMembership, null, 2).substring(0, 500),
-      paymentData: matchingPayment ? JSON.stringify(matchingPayment, null, 2).substring(0, 500) : 'No payment found'
-    });
+    console.log('=== WHOP MEMBERSHIP CHECK DEBUG ===');
+    console.log('Authenticated Email:', authenticatedEmail);
+    console.log('Membership Found:', !!matchingMembership);
+    console.log('Payment Found:', !!matchingPayment);
+    console.log('Membership Email:', matchingMembership?.email || matchingMembership?.user?.email || matchingMembership?.member?.email || 'NO EMAIL IN MEMBERSHIP');
+    console.log('Payment Email:', matchingPayment?.user?.email || matchingPayment?.email || 'NO EMAIL IN PAYMENT');
+    console.log('Plan Price:', planPrice);
+    console.log('Normalized Price:', normalizedPrice);
+    console.log('Reason:', reason || 'NO REASON');
+    console.log('Plan Name:', matchingMembership.plan?.name || 'NO PLAN NAME');
+    console.log('Plan ID:', matchingMembership.plan?.id || 'NO PLAN ID');
+    console.log('Is PAYP by Price and Reason:', isPaypByPriceAndReason);
+    console.log('Is One Dollar:', isOneDollar);
+    console.log('Subscription Type:', subscriptionType);
+    console.log('Is One Time Payment:', isOneTimePayment);
+    console.log('Membership Status:', matchingMembership?.status || 'NO STATUS');
+    console.log('PAYP Payment Count:', paypPaymentCount);
+    console.log('All Payments Sample:', JSON.stringify(allPaymentsDebug.slice(0, 5), null, 2));
+    console.log('Matched PAYP Payments:', JSON.stringify(matchedPaymentsDebug, null, 2));
+    console.log('Membership Data (sample):', JSON.stringify({
+      id: matchingMembership?.id,
+      email: matchingMembership?.email || matchingMembership?.user?.email,
+      status: matchingMembership?.status,
+      plan: matchingMembership?.plan ? {
+        id: matchingMembership.plan.id,
+        name: matchingMembership.plan.name,
+        price: matchingMembership.plan.price
+      } : null
+    }, null, 2));
+    console.log('====================================');
     
     // Count PAYP payments for this user
     let paypPaymentCount = 0;
-    if (matchingPayment || isOneTimePayment || subscriptionType === 'payp') {
-      // Count all PAYP payments (one-time $1 payments)
-      try {
-        const paymentsResponse = await fetch(`https://api.whop.com/api/v2/payments`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${whopApiKey}`,
-            'Content-Type': 'application/json'
+    let allPaymentsDebug = [];
+    let matchedPaymentsDebug = [];
+    
+    // Always try to fetch payments to count PAYP purchases
+    try {
+      const paymentsResponse = await fetch(`https://api.whop.com/api/v2/payments`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${whopApiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (paymentsResponse.ok) {
+        const paymentsData = await paymentsResponse.json();
+        const allPayments = paymentsData.data || [];
+        
+        // Log all payments for debugging
+        allPaymentsDebug = allPayments.map(p => ({
+          id: p.id,
+          email: p.user?.email || p.email || 'no email',
+          amount: p.amount || p.plan?.price || 'no amount',
+          reason: p.reason || 'no reason',
+          status: p.status || 'no status',
+          created_at: p.created_at || 'no date'
+        }));
+        
+        // Filter payments for this user that are PAYP ($1, one-time)
+        const userPayments = allPayments.filter(payment => {
+          const paymentEmail = payment.user?.email || payment.email || '';
+          const paymentAmount = payment.amount || payment.plan?.price || 0;
+          const paymentReason = (payment.reason || '').toLowerCase();
+          const normalizedAmount = typeof paymentAmount === 'number' ? paymentAmount : parseFloat(String(paymentAmount).replace(/[^0-9.]/g, ''));
+          
+          const emailMatches = paymentEmail.toLowerCase() === authenticatedEmail;
+          const isOneDollar = normalizedAmount === 1 || normalizedAmount === 1.0;
+          const isOneTime = paymentReason.includes('one time payment') || 
+                           paymentReason.includes('one-time payment') || 
+                           paymentReason.includes('onetime payment') ||
+                           payment.status === 'succeeded';
+          
+          if (emailMatches && isOneDollar && isOneTime) {
+            matchedPaymentsDebug.push({
+              id: payment.id,
+              email: paymentEmail,
+              amount: paymentAmount,
+              normalizedAmount: normalizedAmount,
+              reason: payment.reason,
+              status: payment.status,
+              created_at: payment.created_at
+            });
+            return true;
           }
+          
+          return false;
         });
         
-        if (paymentsResponse.ok) {
-          const paymentsData = await paymentsResponse.json();
-          // Filter payments for this user that are PAYP ($1, one-time)
-          const userPayments = paymentsData.data?.filter(payment => {
-            const paymentEmail = payment.user?.email || payment.email || '';
-            const paymentAmount = payment.amount || payment.plan?.price || 0;
-            const paymentReason = (payment.reason || '').toLowerCase();
-            const normalizedAmount = typeof paymentAmount === 'number' ? paymentAmount : parseFloat(String(paymentAmount).replace(/[^0-9.]/g, ''));
-            
-            return paymentEmail.toLowerCase() === authenticatedEmail &&
-                   (normalizedAmount === 1 || normalizedAmount === 1.0) &&
-                   (paymentReason.includes('one time payment') || paymentReason.includes('one-time payment') || paymentReason.includes('onetime payment') || payment.status === 'succeeded');
-          });
-          
-          paypPaymentCount = userPayments?.length || 0;
-        }
-      } catch (error) {
-        console.error('Error counting PAYP payments:', error);
+        paypPaymentCount = userPayments.length;
+        
+        // Detailed logging
+        console.log('=== PAYP PAYMENT COUNTING DEBUG ===');
+        console.log('Authenticated Email:', authenticatedEmail);
+        console.log('Total payments in system:', allPayments.length);
+        console.log('All payments (first 10):', JSON.stringify(allPaymentsDebug.slice(0, 10), null, 2));
+        console.log('Matched PAYP payments:', JSON.stringify(matchedPaymentsDebug, null, 2));
+        console.log('PAYP Payment Count:', paypPaymentCount);
+        console.log('===================================');
+      } else {
+        const errorText = await paymentsResponse.text();
+        console.error('Error fetching payments:', paymentsResponse.status, errorText);
       }
+    } catch (error) {
+      console.error('Error counting PAYP payments:', error);
     }
     
     return res.status(200).json({
@@ -336,7 +390,20 @@ export default async function handler(req, res) {
       expiresAt: expiresAt,
       memberId: matchingMembership.id,
       isOneTimePayment: isOneTimePayment,
-      paypPaymentCount: paypPaymentCount // Number of PAYP payments made
+      paypPaymentCount: paypPaymentCount, // Number of PAYP payments made
+      // Debug information (remove in production)
+      debug: {
+        authenticatedEmail: authenticatedEmail,
+        membershipEmail: matchingMembership?.email || matchingMembership?.user?.email || matchingMembership?.member?.email,
+        paymentEmail: matchingPayment?.user?.email || matchingPayment?.email,
+        planPrice: planPrice,
+        normalizedPrice: normalizedPrice,
+        reason: reason,
+        isOneDollar: isOneDollar,
+        isPaypByPriceAndReason: isPaypByPriceAndReason,
+        totalPaymentsFound: allPaymentsDebug.length,
+        matchedPayments: matchedPaymentsDebug
+      }
     });
     
   } catch (error) {
