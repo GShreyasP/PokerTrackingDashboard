@@ -720,7 +720,7 @@ async function checkWhopSubscriptionStatus(userEmail) {
     }
     
     try {
-        // Send only email to match payments (DO NOT send checkWhitelistOnly here)
+        // Send only email to match payments
         const response = await fetch('/api/whop-check-subscription', {
             method: 'POST',
             headers: {
@@ -728,7 +728,6 @@ async function checkWhopSubscriptionStatus(userEmail) {
             },
             body: JSON.stringify({ 
                 email: userEmail
-                // NOTE: checkWhitelistOnly is NOT sent here - this triggers full Whop payment check
             })
         });
         
@@ -7191,6 +7190,39 @@ window.handlePayAsYouPlay = handlePayAsYouPlay;
 window.handleMonthlySubscription = handleMonthlySubscription;
 window.handleSixMonthSubscription = handleSixMonthSubscription;
 window.checkWhopSubscriptionStatus = checkWhopSubscriptionStatus;
+
+// Debug function to get all payments from Whop
+async function getAllWhopPayments() {
+    try {
+        const response = await fetch('/api/whop-check-subscription', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                getAllPayments: true
+            })
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Failed to get all payments:', response.status, errorText);
+            return null;
+        }
+        
+        const data = await response.json();
+        console.log('=== ALL WHOP PAYMENTS ===');
+        console.log('Total Payments:', data.totalPayments);
+        console.log('Payments:', JSON.stringify(data.payments, null, 2));
+        console.log('Sample Raw Payment:', data.sampleRawPayment);
+        console.log('========================');
+        return data;
+    } catch (error) {
+        console.error('Error getting all payments:', error);
+        return null;
+    }
+}
+window.getAllWhopPayments = getAllWhopPayments;
 window.refreshSubscriptionStatus = refreshSubscriptionStatus;
 window.canCreateTracker = canCreateTracker;
 window.updatePlanDisplay = updatePlanDisplay;

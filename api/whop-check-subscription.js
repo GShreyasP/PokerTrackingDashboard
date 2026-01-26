@@ -15,9 +15,99 @@ export default async function handler(req, res) {
   }
   
   try {
-    const { email } = req.body;
+    const { email, getAllPayments } = req.body;
     
-    // Security: Require email
+    // If getAllPayments is true, return all payments for debugging
+    if (getAllPayments) {
+      const whopApiKey = process.env.WHOP_API_KEY;
+      
+      if (!whopApiKey) {
+        return res.status(500).json({ error: 'Whop API not configured' });
+      }
+      
+      let allPayments = [];
+      
+      try {
+        // Fetch all payments with pagination
+        let page = 1;
+        let hasMorePages = true;
+        
+        while (hasMorePages) {
+          const paymentsResponse = await fetch(`https://api.whop.com/api/v2/payments?per_page=100&page=${page}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${whopApiKey}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (!paymentsResponse.ok) {
+            const errorText = await paymentsResponse.text();
+            console.error(`Error fetching payments page ${page}:`, paymentsResponse.status, errorText);
+            break;
+          }
+          
+          const paymentsData = await paymentsResponse.json();
+          
+          // Handle different response structures
+          let pagePayments = [];
+          if (Array.isArray(paymentsData)) {
+            pagePayments = paymentsData;
+          } else if (Array.isArray(paymentsData.data)) {
+            pagePayments = paymentsData.data;
+          } else if (paymentsData.payments && Array.isArray(paymentsData.payments)) {
+            pagePayments = paymentsData.payments;
+          }
+          
+          allPayments = [...allPayments, ...pagePayments];
+          
+          // Check if there are more pages
+          const meta = paymentsData.meta || {};
+          const totalPages = meta.total_pages || meta.last_page || 1;
+          hasMorePages = page < totalPages;
+          page++;
+          
+          // Safety limit: don't fetch more than 10 pages
+          if (page > 10) break;
+        }
+        
+        // Return all payments with key fields for inspection
+        const paymentSummary = allPayments.map(p => ({
+          id: p.id,
+          email: p.user?.email || p.email || p.member?.email || 'no email',
+          userId: p.user?.id || p.member?.id || 'no user id',
+          amount: p.amount || p.total || p.total_spend || p.plan?.price || p.plan?.amount || 'no amount',
+          amountRaw: p.amount,
+          totalRaw: p.total,
+          totalSpendRaw: p.total_spend,
+          planPriceRaw: p.plan?.price,
+          planAmountRaw: p.plan?.amount,
+          reason: p.reason || 'no reason',
+          status: p.status || 'no status',
+          created_at: p.created_at || 'no date',
+          product: p.product?.title || p.product?.name || 'no product',
+          plan: p.plan?.name || 'no plan',
+          planId: p.plan?.id || 'no plan id',
+          // Include full payment object for deep inspection (limit size)
+          fullPayment: JSON.stringify(p).substring(0, 500)
+        }));
+        
+        return res.status(200).json({
+          totalPayments: allPayments.length,
+          payments: paymentSummary,
+          sampleRawPayment: allPayments[0] || null
+        });
+        
+      } catch (error) {
+        console.error('Error fetching all payments:', error);
+        return res.status(500).json({ 
+          error: 'Failed to fetch payments',
+          details: error.message 
+        });
+      }
+    }
+    
+    // Security: Require email for normal subscription check
     if (!email) {
       return res.status(401).json({ error: 'Email is required.' });
     }
