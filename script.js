@@ -722,7 +722,7 @@ async function checkWhopSubscriptionStatus(userEmail) {
     }
     
     try {
-        // Send only email to match payments
+        // Send only email to match payments (DO NOT send checkWhitelistOnly here)
         const response = await fetch('/api/whop-check-subscription', {
             method: 'POST',
             headers: {
@@ -730,6 +730,7 @@ async function checkWhopSubscriptionStatus(userEmail) {
             },
             body: JSON.stringify({ 
                 email: userEmail
+                // NOTE: checkWhitelistOnly is NOT sent here - this triggers full Whop payment check
             })
         });
         
