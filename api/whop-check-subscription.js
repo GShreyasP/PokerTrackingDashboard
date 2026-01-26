@@ -161,11 +161,34 @@ export default async function handler(req, res) {
       
       if (paymentsResponse.ok) {
         const paymentsData = await paymentsResponse.json();
-        allPayments = paymentsData.data || [];
+        
+        // Log raw response structure for debugging
+        console.log('=== PAYMENTS API RAW RESPONSE ===');
+        console.log('Response keys:', Object.keys(paymentsData));
+        console.log('Has data array:', Array.isArray(paymentsData.data));
+        console.log('Data length:', paymentsData.data?.length || 0);
+        console.log('Meta info:', paymentsData.meta || 'no meta');
+        console.log('First payment sample:', paymentsData.data?.[0] ? JSON.stringify(paymentsData.data[0], null, 2).substring(0, 500) : 'no payments');
+        console.log('================================');
+        
+        // Handle different response structures
+        if (Array.isArray(paymentsData)) {
+          allPayments = paymentsData;
+        } else if (Array.isArray(paymentsData.data)) {
+          allPayments = paymentsData.data;
+        } else if (paymentsData.payments && Array.isArray(paymentsData.payments)) {
+          allPayments = paymentsData.payments;
+        } else {
+          allPayments = [];
+          console.warn('Unexpected payments response structure:', Object.keys(paymentsData));
+        }
         
         // Handle pagination if there are more pages
-        let currentPage = paymentsData.meta?.current_page || 1;
-        const totalPages = paymentsData.meta?.total_pages || 1;
+        const meta = paymentsData.meta || {};
+        let currentPage = meta.current_page || 1;
+        const totalPages = meta.total_pages || meta.last_page || 1;
+        
+        console.log('Pagination info:', { currentPage, totalPages, totalPayments: allPayments.length });
         
         while (currentPage < totalPages) {
           currentPage++;
@@ -179,7 +202,10 @@ export default async function handler(req, res) {
           
           if (nextPageResponse.ok) {
             const nextPageData = await nextPageResponse.json();
-            allPayments = [...allPayments, ...(nextPageData.data || [])];
+            const nextPagePayments = Array.isArray(nextPageData) ? nextPageData : 
+                                   (Array.isArray(nextPageData.data) ? nextPageData.data : 
+                                   (nextPageData.payments || []));
+            allPayments = [...allPayments, ...nextPagePayments];
           }
         }
         
