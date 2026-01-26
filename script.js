@@ -682,18 +682,24 @@ async function showMainScreen() {
 
 // Check if an email is whitelisted for Pro plan (server-side check)
 async function isEmailWhitelisted(email) {
-    if (!email) {
+    if (!email || !window.currentUser) {
         return false;
     }
     
     try {
         // Check whitelist via serverless function (secure, server-side)
+        // Pass authentication info for security
         const response = await fetch('/api/whop-check-subscription', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ email: email, checkWhitelistOnly: true })
+            body: JSON.stringify({ 
+                email: email,
+                userId: window.currentUser.uid,
+                userEmail: window.currentUser.email,
+                checkWhitelistOnly: true 
+            })
         });
         
         if (response.ok) {
@@ -709,18 +715,23 @@ async function isEmailWhitelisted(email) {
 
 // Check user's subscription status from Whop
 async function checkWhopSubscriptionStatus(userEmail) {
-    if (!userEmail) {
-        console.error('No email provided for subscription check');
+    if (!userEmail || !window.currentUser) {
+        console.error('No email or user authentication provided for subscription check');
         return null;
     }
     
     try {
+        // Pass authentication info for security - server will verify email matches authenticated user
         const response = await fetch('/api/whop-check-subscription', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ email: userEmail })
+            body: JSON.stringify({ 
+                email: userEmail,
+                userId: window.currentUser.uid,
+                userEmail: window.currentUser.email
+            })
         });
         
         if (!response.ok) {

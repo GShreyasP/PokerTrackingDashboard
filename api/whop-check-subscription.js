@@ -15,29 +15,38 @@ export default async function handler(req, res) {
   }
   
   try {
-    const { email, userId } = req.body;
+    const { email, userId, userEmail } = req.body;
     
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
+    // Security: Require authentication
+    if (!userId || !userEmail) {
+      return res.status(401).json({ error: 'Authentication required. userId and userEmail must be provided.' });
     }
+    
+    // Security: Verify the email being checked matches the authenticated user's email
+    // This prevents users from checking other people's subscription status
+    if (!email || email.toLowerCase().trim() !== userEmail.toLowerCase().trim()) {
+      return res.status(403).json({ error: 'Forbidden: You can only check your own subscription status.' });
+    }
+    
+    // Use the authenticated user's email (more secure than trusting the email parameter)
+    const authenticatedEmail = userEmail.toLowerCase().trim();
     
     // Check whitelist first (server-side, secure)
     const whitelistEnv = process.env.PRO_PLAN_WHITELIST || '';
     const whitelist = whitelistEnv.split(',').map(e => e.trim().toLowerCase()).filter(e => e);
-    const emailLower = email.toLowerCase().trim();
     
     // If only checking whitelist, return early
     if (req.body.checkWhitelistOnly) {
       return res.status(200).json({
-        hasSubscription: whitelist.includes(emailLower),
-        subscriptionType: whitelist.includes(emailLower) ? 'pro' : null,
+        hasSubscription: whitelist.includes(authenticatedEmail),
+        subscriptionType: whitelist.includes(authenticatedEmail) ? 'pro' : null,
         expiresAt: null,
-        isWhitelisted: whitelist.includes(emailLower)
+        isWhitelisted: whitelist.includes(authenticatedEmail)
       });
     }
     
     // If whitelisted, return Pro plan status without checking Whop
-    if (whitelist.includes(emailLower)) {
+    if (whitelist.includes(authenticatedEmail)) {
       return res.status(200).json({
         hasSubscription: true,
         subscriptionType: 'pro',
@@ -80,9 +89,9 @@ export default async function handler(req, res) {
     
     const membershipsData = await membershipsResponse.json();
     
-    // Find membership with matching email
+    // Find membership with matching email (use authenticated email for security)
     const matchingMembership = membershipsData.data?.find(membership => {
-      return membership.email?.toLowerCase() === email.toLowerCase();
+      return membership.email?.toLowerCase() === authenticatedEmail;
     });
     
     if (!matchingMembership) {
