@@ -15,10 +15,35 @@ export default async function handler(req, res) {
   }
   
   try {
-    const { email } = req.body;
+    const { email, userId } = req.body;
     
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
+    }
+    
+    // Check whitelist first (server-side, secure)
+    const whitelistEnv = process.env.PRO_PLAN_WHITELIST || '';
+    const whitelist = whitelistEnv.split(',').map(e => e.trim().toLowerCase()).filter(e => e);
+    const emailLower = email.toLowerCase().trim();
+    
+    // If only checking whitelist, return early
+    if (req.body.checkWhitelistOnly) {
+      return res.status(200).json({
+        hasSubscription: whitelist.includes(emailLower),
+        subscriptionType: whitelist.includes(emailLower) ? 'pro' : null,
+        expiresAt: null,
+        isWhitelisted: whitelist.includes(emailLower)
+      });
+    }
+    
+    // If whitelisted, return Pro plan status without checking Whop
+    if (whitelist.includes(emailLower)) {
+      return res.status(200).json({
+        hasSubscription: true,
+        subscriptionType: 'pro',
+        expiresAt: null,
+        isWhitelisted: true
+      });
     }
     
     const whopApiKey = process.env.WHOP_API_KEY;

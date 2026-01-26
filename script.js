@@ -680,21 +680,31 @@ async function showMainScreen() {
 
 // ==================== SUBSCRIPTION MANAGEMENT ====================
 
-// Whitelist of emails that have permanent Pro plan access
-// Add or remove emails from this array to grant/revoke permanent Pro access
-const PRO_PLAN_WHITELIST = [
-    // Add whitelisted emails here (lowercase for case-insensitive matching)
-    "gurushreyasp@gmail.com"
-    // Example: 'beta@example.com',
-];
-
-// Check if an email is whitelisted for Pro plan
-function isEmailWhitelisted(email) {
+// Check if an email is whitelisted for Pro plan (server-side check)
+async function isEmailWhitelisted(email) {
     if (!email) {
         return false;
     }
-    const emailLower = email.toLowerCase().trim();
-    return PRO_PLAN_WHITELIST.includes(emailLower);
+    
+    try {
+        // Check whitelist via serverless function (secure, server-side)
+        const response = await fetch('/api/whop-check-subscription', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email: email, checkWhitelistOnly: true })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            return data.isWhitelisted === true;
+        }
+    } catch (error) {
+        console.error('Error checking whitelist:', error);
+    }
+    
+    return false;
 }
 
 // Check user's subscription status from Whop
@@ -732,15 +742,18 @@ async function getSubscriptionStatus(userId, userEmail = null) {
         return null;
     }
     
-    // Check if user is whitelisted first
-    if (userEmail && isEmailWhitelisted(userEmail)) {
-        return {
-            hasSubscription: true,
-            subscriptionType: 'pro',
-            expiresAt: null, // Never expires for whitelisted users
-            lastChecked: null,
-            isWhitelisted: true
-        };
+    // Check if user is whitelisted first (async check)
+    if (userEmail) {
+        const whitelisted = await isEmailWhitelisted(userEmail);
+        if (whitelisted) {
+            return {
+                hasSubscription: true,
+                subscriptionType: 'pro',
+                expiresAt: null, // Never expires for whitelisted users
+                lastChecked: null,
+                isWhitelisted: true
+            };
+        }
     }
     
     try {
@@ -795,8 +808,9 @@ async function refreshSubscriptionStatus() {
     const userId = window.currentUser.uid;
     const userEmail = window.currentUser.email;
     
-    // Check if user is whitelisted first
-    if (isEmailWhitelisted(userEmail)) {
+    // Check if user is whitelisted first (async)
+    const whitelisted = await isEmailWhitelisted(userEmail);
+    if (whitelisted) {
         const whitelistedStatus = {
             hasSubscription: true,
             subscriptionType: 'pro',
@@ -916,8 +930,9 @@ async function canCreateTracker() {
         const userId = window.currentUser.uid;
         const userEmail = window.currentUser.email;
         
-        // Check if user is whitelisted first
-        if (isEmailWhitelisted(userEmail)) {
+        // Check if user is whitelisted first (async)
+        const whitelisted = await isEmailWhitelisted(userEmail);
+        if (whitelisted) {
             return { canCreate: true, subscriptionType: 'pro', isWhitelisted: true };
         }
         

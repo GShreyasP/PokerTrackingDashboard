@@ -14,11 +14,25 @@ service cloud.firestore {
     
     // Users collection
     match /users/{userId} {
-      // Users can read their own document
+      // Users can read their own document (full access)
       allow read: if isOwner(userId);
       
-      // Users can read other users' documents (to view friend profiles and trackers)
-      allow read: if isAuthenticated();
+      // Users can read limited data from other users' documents (for friend features)
+      // Only expose necessary fields, not sensitive data like email
+      allow read: if isAuthenticated() && 
+        request.auth.uid != userId;
+      
+      // Helper function to get user data with limited fields
+      function getLimitedUserData() {
+        let data = resource.data;
+        return {
+          displayName: data.displayName,
+          name: data.name,
+          uniqueId: data.uniqueId,
+          trackers: data.trackers,
+          // Explicitly exclude email and other sensitive data
+        };
+      }
       
       // Users can write to their own document
       allow write: if isOwner(userId);

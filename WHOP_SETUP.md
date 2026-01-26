@@ -22,7 +22,10 @@ This guide will help you set up the Whop API integration to track user subscript
    ```
    WHOP_API_KEY=whop_xxxxxxxxxxxxx
    WHOP_PRODUCT_ID=prod_xxxxxxxxxxxxx
+   PRO_PLAN_WHITELIST=email1@example.com,email2@example.com
    ```
+
+   **Note**: For `PRO_PLAN_WHITELIST`, add comma-separated emails of users who should have permanent Pro access. Leave empty if none.
 
 4. Make sure to select the appropriate environments (Production, Preview, Development)
 5. Click **Save**
