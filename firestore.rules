@@ -14,25 +14,16 @@ service cloud.firestore {
     
     // Users collection
     match /users/{userId} {
-      // Users can read their own document (full access)
+      // Users can read their own document (full access including email)
       allow read: if isOwner(userId);
       
-      // Users can read limited data from other users' documents (for friend features)
-      // Only expose necessary fields, not sensitive data like email
-      allow read: if isAuthenticated() && 
-        request.auth.uid != userId;
-      
-      // Helper function to get user data with limited fields
-      function getLimitedUserData() {
-        let data = resource.data;
-        return {
-          displayName: data.displayName,
-          name: data.name,
-          uniqueId: data.uniqueId,
-          trackers: data.trackers,
-          // Explicitly exclude email and other sensitive data
-        };
-      }
+      // Other authenticated users can read user documents for friend features
+      // NOTE: This exposes user data including email. Consider restricting further if privacy is critical.
+      // For now, this is needed for friend search and tracker sharing features.
+      // If you want stricter privacy, you could:
+      // 1. Create a separate publicProfiles collection with limited data
+      // 2. Only expose email in friend requests, not general reads
+      allow read: if isAuthenticated();
       
       // Users can write to their own document
       allow write: if isOwner(userId);
