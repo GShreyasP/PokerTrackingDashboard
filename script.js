@@ -684,7 +684,7 @@ async function showMainScreen() {
 // Add or remove emails from this array to grant/revoke permanent Pro access
 const PRO_PLAN_WHITELIST = [
     // Add whitelisted emails here (lowercase for case-insensitive matching)
-    // Example: 'admin@example.com',
+    "gurushreyasp@gmail.com"
     // Example: 'beta@example.com',
 ];
 
