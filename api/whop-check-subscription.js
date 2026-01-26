@@ -15,20 +15,15 @@ export default async function handler(req, res) {
   }
   
   try {
-    const { email, userId, userEmail } = req.body;
+    const { email } = req.body;
     
-    // Security: Require authentication
-    if (!userId || !userEmail) {
-      return res.status(401).json({ error: 'Authentication required. userId and userEmail must be provided.' });
+    // Security: Require email
+    if (!email) {
+      return res.status(401).json({ error: 'Email is required.' });
     }
     
-    // Security: Verify the email being checked matches the authenticated user's email
-    if (!email || email.toLowerCase().trim() !== userEmail.toLowerCase().trim()) {
-      return res.status(403).json({ error: 'Forbidden: You can only check your own subscription status.' });
-    }
-    
-    // Use the authenticated user's email
-    const authenticatedEmail = userEmail.toLowerCase().trim();
+    // Use the provided email
+    const authenticatedEmail = email.toLowerCase().trim();
     
     // Check whitelist first (server-side, secure)
     const whitelistEnv = process.env.PRO_PLAN_WHITELIST || '';

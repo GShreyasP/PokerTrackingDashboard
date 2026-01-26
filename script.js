@@ -699,8 +699,6 @@ async function isEmailWhitelisted(email) {
             },
             body: JSON.stringify({ 
                 email: email,
-                userId: window.currentUser.uid,
-                userEmail: window.currentUser.email,
                 checkWhitelistOnly: true 
             })
         });
@@ -724,16 +722,14 @@ async function checkWhopSubscriptionStatus(userEmail) {
     }
     
     try {
-        // Pass authentication info for security - server will verify email matches authenticated user
+        // Send only email to match payments
         const response = await fetch('/api/whop-check-subscription', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
-                email: userEmail,
-                userId: window.currentUser.uid,
-                userEmail: window.currentUser.email
+                email: userEmail
             })
         });
         
