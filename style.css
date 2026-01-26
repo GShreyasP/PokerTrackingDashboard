@@ -115,6 +115,19 @@ body:has(.auth-page:not(.hidden))::before {
     box-sizing: border-box;
 }
 
+/* Header left section - menu button and title together */
+.page-header > .hamburger-menu-btn {
+    margin-right: 16px;
+}
+
+.header-title-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    flex: 0 0 auto;
+}
+
 /* Ensure header is NEVER fixed on auth page */
 body:has(.auth-page:not(.hidden)) .page-header {
     position: relative !important;
@@ -3965,6 +3978,16 @@ h3 {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
+    margin-left: 0;
+    flex-shrink: 0;
+}
+
+/* Ensure header actions stay on the right */
+.header-actions-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 /* Plan Badge in Header */
