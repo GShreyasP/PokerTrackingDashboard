@@ -147,15 +147,36 @@ export default async function handler(req, res) {
     
     // Check for PAYP based on plan price ($1) and reason ("one time payment")
     // This is the most reliable way to identify PAYP users
-    const planPrice = matchingMembership.plan?.price || matchingMembership.plan?.amount || matchingMembership.price || matchingMembership.amount;
-    const reason = (matchingMembership.reason || '').toLowerCase();
+    // Check multiple possible locations for price and reason fields
+    const planPrice = matchingMembership.plan?.price || 
+                     matchingMembership.plan?.amount || 
+                     matchingMembership.plan?.initial_price ||
+                     matchingMembership.plan?.renewal_price ||
+                     matchingMembership.price || 
+                     matchingMembership.amount;
+    
+    const reason = (matchingMembership.reason || 
+                   matchingMembership.payment?.reason ||
+                   matchingMembership.plan?.reason || '').toLowerCase();
+    
     const planName = (matchingMembership.plan?.name || '').toLowerCase();
+    
+    // Normalize price to number for comparison (handle $1, $1.00, 1, 1.00, etc.)
+    const normalizePrice = (price) => {
+      if (!price && price !== 0) return null;
+      if (typeof price === 'number') return price;
+      const numStr = String(price).replace(/[^0-9.]/g, '');
+      const num = parseFloat(numStr);
+      return isNaN(num) ? null : num;
+    };
+    
+    const normalizedPrice = normalizePrice(planPrice);
+    const isOneDollar = normalizedPrice === 1 || normalizedPrice === 1.0;
     
     // Check if plan price is $1 and reason is "one time payment"
     const isPaypByPriceAndReason = (
-      (planPrice === 1 || planPrice === 1.00 || planPrice === '$1' || planPrice === '$1.00' || 
-       String(planPrice).includes('1.00') || String(planPrice).replace(/[^0-9.]/g, '') === '1') &&
-      (reason.includes('one time payment') || reason.includes('one-time payment'))
+      isOneDollar &&
+      (reason.includes('one time payment') || reason.includes('one-time payment') || reason.includes('onetime payment'))
     );
     
     if (matchingMembership.plan) {
@@ -191,8 +212,7 @@ export default async function handler(req, res) {
       if (!isOneTimePayment) {
         if (!matchingMembership.recurring || matchingMembership.billing_type === 'one_time' || planType === 'one_time') {
           // If price is $1, it's likely PAYP even without explicit reason
-          if (planPrice === 1 || planPrice === 1.00 || planPrice === '$1' || planPrice === '$1.00' || 
-              String(planPrice).includes('1.00') || String(planPrice).replace(/[^0-9.]/g, '') === '1') {
+          if (isOneDollar) {
             subscriptionType = 'payp';
             isOneTimePayment = true;
           }
@@ -209,10 +229,12 @@ export default async function handler(req, res) {
     // Log for debugging (remove in production or make conditional)
     console.log('Whop membership check:', {
       planPrice,
+      normalizedPrice,
       reason,
       planName: matchingMembership.plan?.name,
       planId: matchingMembership.plan?.id,
       isPaypByPriceAndReason,
+      isOneDollar,
       subscriptionType,
       isOneTimePayment
     });
