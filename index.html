@@ -726,6 +726,22 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Confirmation Modal for PAYP Credit Usage -->
+        <div id="confirm-modal" class="custom-modal hidden" onclick="if(event.target === this) closeConfirmModal()">
+            <div class="custom-modal-content" onclick="event.stopPropagation()">
+                <div class="custom-modal-header">
+                    <h3>Confirm Table Creation</h3>
+                </div>
+                <div class="custom-modal-body">
+                    <p id="confirm-message"></p>
+                </div>
+                <div class="custom-modal-footer">
+                    <button class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+                    <button class="btn btn-primary" id="confirm-yes-btn" onclick="confirmCreateTracker()">Create Table</button>
+                </div>
+            </div>
+        </div>
     </div>
     
     <script src="/script.js"></script>

@@ -797,6 +797,13 @@ async function updateSubscriptionStatus(userId, subscriptionData) {
     
     try {
         const userRef = window.firebaseDb.collection('users').doc(userId);
+        const userDoc = await userRef.get();
+        const userData = userDoc.exists ? userDoc.data() : {};
+        
+        // Check if user just got PAYP subscription (didn't have it before)
+        const wasPayp = userData.subscriptionType === 'payp' || userData.isOneTimePayment;
+        const isNowPayp = subscriptionData.subscriptionType === 'payp' || subscriptionData.isOneTimePayment;
+        
         await userRef.set({
             hasSubscription: subscriptionData.hasSubscription || false,
             subscriptionType: subscriptionData.subscriptionType || null,
@@ -805,10 +812,46 @@ async function updateSubscriptionStatus(userId, subscriptionData) {
             isOneTimePayment: subscriptionData.isOneTimePayment || false
         }, { merge: true });
         
+        // Initialize credits if user just got PAYP subscription
+        if (isNowPayp && !wasPayp) {
+            await initializePaypCredits(userId);
+        }
+        
         // Update plan display after updating status
         updatePlanDisplay(subscriptionData);
     } catch (error) {
         console.error('Error updating subscription status:', error);
+    }
+}
+
+// Initialize PAYP credits (set to 1 if not already set)
+async function initializePaypCredits(userId) {
+    if (!window.firebaseDb || !userId) {
+        return;
+    }
+    
+    try {
+        const userRef = window.firebaseDb.collection('users').doc(userId);
+        const userDoc = await userRef.get();
+        
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            // Only initialize if credits don't exist or are 0
+            if (userData.paypCredits === undefined || userData.paypCredits === null) {
+                await userRef.set({
+                    paypCredits: 1
+                }, { merge: true });
+                console.log('PAYP credits initialized to 1');
+            }
+        } else {
+            // New user, set credits to 1
+            await userRef.set({
+                paypCredits: 1
+            }, { merge: true });
+            console.log('PAYP credits initialized to 1 for new user');
+        }
+    } catch (error) {
+        console.error('Error initializing PAYP credits:', error);
     }
 }
 
@@ -851,6 +894,11 @@ async function refreshSubscriptionStatus() {
         
         // Update Firestore with latest status
         await updateSubscriptionStatus(userId, subscriptionData);
+        
+        // Initialize PAYP credits if user just got PAYP subscription
+        if (subscriptionData.subscriptionType === 'payp' || subscriptionData.isOneTimePayment) {
+            await initializePaypCredits(userId);
+        }
         
         // If subscription just expired, mark all trackers for expiration
         if (subscriptionJustExpired && !subscriptionData.isOneTimePayment) {
@@ -1093,10 +1141,26 @@ async function canCreateTracker() {
             subscriptionStatus = await refreshSubscriptionStatus();
         }
         
+        // Check if user is PAYP
+        const isPaypUser = subscriptionStatus?.subscriptionType === 'payp' || subscriptionStatus?.isOneTimePayment;
+        
+        // For PAYP users, check credits first
+        if (isPaypUser) {
+            const credits = userData.paypCredits || 0;
+            if (credits <= 0) {
+                return {
+                    canCreate: false,
+                    reason: 'You have no credits remaining. Please purchase the Pay as you Play plan again ($1.00) to create another table.',
+                    isPaypUser: true,
+                    needsCredits: true
+                };
+            }
+        }
+        
         // Active limit based on subscription type
         // PAYP users (one-time payment): 1 active tracker max
         // All other users: 2 active trackers max (DDoS protection)
-        const maxActiveTrackers = (subscriptionStatus?.isOneTimePayment || subscriptionStatus?.subscriptionType === 'payp') ? 1 : 2;
+        const maxActiveTrackers = isPaypUser ? 1 : 2;
         
         if (trackers.length >= maxActiveTrackers) {
             const limitText = maxActiveTrackers === 1 ? '1 active table' : '2 active tables';
@@ -1125,7 +1189,11 @@ async function canCreateTracker() {
                 }
             }
             // Active subscription or whitelisted - unlimited lifetime trackers (but still 2 active max)
-            return { canCreate: true, subscriptionType: subscriptionStatus.subscriptionType || 'pro' };
+            return { 
+                canCreate: true, 
+                subscriptionType: subscriptionStatus.subscriptionType || 'pro',
+                isPaypUser: isPaypUser
+            };
         }
         
         // Free tier: Check lifetime limit (3 total trackers ever created)
@@ -1162,8 +1230,8 @@ async function showSetupSection() {
             errorMessage.textContent = reason;
             errorDiv.classList.remove('hidden');
             
-            // Show upgrade button if it's the lifetime limit error
-            if (reason.includes('lifetime limit') && upgradeBtn) {
+            // Show upgrade button if it's the lifetime limit error or PAYP credit error
+            if ((reason.includes('lifetime limit') || reason.includes('no credits')) && upgradeBtn) {
                 upgradeBtn.classList.remove('hidden');
             } else if (upgradeBtn) {
                 upgradeBtn.classList.add('hidden');
@@ -1172,11 +1240,38 @@ async function showSetupSection() {
         return;
     }
     
+    // Check if user is PAYP and has credits - show confirmation
+    if (canCreate.subscriptionType === 'payp' || canCreate.isPaypUser) {
+        const userId = window.currentUser.uid;
+        const userEmail = window.currentUser.email;
+        const subscriptionStatus = await getSubscriptionStatus(userId, userEmail);
+        
+        if (subscriptionStatus?.subscriptionType === 'payp' || subscriptionStatus?.isOneTimePayment) {
+            const userRef = window.firebaseDb.collection('users').doc(userId);
+            const userDoc = await userRef.get();
+            const userData = userDoc.exists ? userDoc.data() : {};
+            const credits = userData.paypCredits || 0;
+            
+            if (credits > 0) {
+                // Show confirmation modal
+                showConfirmModal(credits);
+                return; // Don't proceed yet, wait for confirmation
+            }
+        }
+    }
+    
     // Hide error message if visible
     const errorDiv = document.getElementById('tracker-limit-error');
     if (errorDiv) {
         errorDiv.classList.add('hidden');
     }
+    
+    // Proceed with showing setup section
+    proceedToSetupSection();
+}
+
+// Proceed to setup section (called after confirmation or for non-PAYP users)
+function proceedToSetupSection() {
     
     // Clear tracker ID and name to ensure a new tracker is created
     state.trackerId = null;
@@ -6014,6 +6109,70 @@ function closeAlertModal() {
     }
 }
 
+// Show confirmation modal for PAYP credit usage
+function showConfirmModal(credits) {
+    const modal = document.getElementById('confirm-modal');
+    const messageEl = document.getElementById('confirm-message');
+    
+    if (modal && messageEl) {
+        messageEl.textContent = `Are you sure you want to use 1 credit to create this table? You currently have ${credits} credit${credits !== 1 ? 's' : ''} remaining.`;
+        modal.classList.remove('hidden');
+        
+        // Handle Escape key
+        confirmKeyHandler = function(e) {
+            if (e.key === 'Escape') {
+                closeConfirmModal();
+            }
+        };
+        document.addEventListener('keydown', confirmKeyHandler);
+    }
+}
+
+// Close confirmation modal
+function closeConfirmModal() {
+    const modal = document.getElementById('confirm-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    if (confirmKeyHandler) {
+        document.removeEventListener('keydown', confirmKeyHandler);
+        confirmKeyHandler = null;
+    }
+}
+
+// Confirm and proceed with tracker creation (decrement credit)
+async function confirmCreateTracker() {
+    closeConfirmModal();
+    
+    // Decrement PAYP credit
+    if (window.currentUser && window.firebaseDb) {
+        try {
+            const userId = window.currentUser.uid;
+            const userRef = window.firebaseDb.collection('users').doc(userId);
+            const userDoc = await userRef.get();
+            
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                const currentCredits = userData.paypCredits || 0;
+                const newCredits = Math.max(0, currentCredits - 1);
+                
+                await userRef.set({
+                    paypCredits: newCredits
+                }, { merge: true });
+                
+                console.log(`PAYP credit used. Remaining credits: ${newCredits}`);
+            }
+        } catch (error) {
+            console.error('Error decrementing PAYP credit:', error);
+        }
+    }
+    
+    // Proceed to setup section
+    proceedToSetupSection();
+}
+
+let confirmKeyHandler = null;
+
 // Make functions globally accessible
 window.showAddForm = showAddForm;
 window.showSubtractForm = showSubtractForm;
@@ -6753,6 +6912,8 @@ window.loadPlanDisplay = loadPlanDisplay;
 window.deleteAnalyticsEntry = deleteAnalyticsEntry;
 window.cleanupExpiredTrackers = cleanupExpiredTrackers;
 window.markTrackersForExpiration = markTrackersForExpiration;
+window.closeConfirmModal = closeConfirmModal;
+window.confirmCreateTracker = confirmCreateTracker;
 window.clearTable = clearTable;
 window.selectPersonFromSearch = selectPersonFromSearch;
 window.updateTrackerNameMain = updateTrackerNameMain;
