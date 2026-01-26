@@ -7223,6 +7223,39 @@ async function getAllWhopPayments() {
     }
 }
 window.getAllWhopPayments = getAllWhopPayments;
+
+// Debug function to get all memberships from Whop
+async function getAllWhopMemberships() {
+    try {
+        const response = await fetch('/api/whop-check-subscription', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                getAllMemberships: true
+            })
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Failed to get all memberships:', response.status, errorText);
+            return null;
+        }
+        
+        const data = await response.json();
+        console.log('=== ALL WHOP MEMBERSHIPS ===');
+        console.log('Total Memberships:', data.totalMemberships);
+        console.log('Memberships:', JSON.stringify(data.memberships, null, 2));
+        console.log('Sample Raw Membership:', data.sampleRawMembership);
+        console.log('============================');
+        return data;
+    } catch (error) {
+        console.error('Error getting all memberships:', error);
+        return null;
+    }
+}
+window.getAllWhopMemberships = getAllWhopMemberships;
 window.refreshSubscriptionStatus = refreshSubscriptionStatus;
 window.canCreateTracker = canCreateTracker;
 window.updatePlanDisplay = updatePlanDisplay;

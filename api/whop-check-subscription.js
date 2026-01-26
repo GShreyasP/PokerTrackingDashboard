@@ -15,7 +15,94 @@ export default async function handler(req, res) {
   }
   
   try {
-    const { email, getAllPayments } = req.body;
+    const { email, getAllPayments, getAllMemberships } = req.body;
+    
+    // If getAllMemberships is true, return all memberships for debugging
+    if (getAllMemberships) {
+      const whopApiKey = process.env.WHOP_API_KEY;
+      
+      if (!whopApiKey) {
+        return res.status(500).json({ error: 'Whop API not configured' });
+      }
+      
+      let allMemberships = [];
+      
+      try {
+        // Fetch all memberships with pagination
+        let page = 1;
+        let hasMorePages = true;
+        
+        while (hasMorePages) {
+          const membershipsResponse = await fetch(`https://api.whop.com/api/v2/memberships?per_page=100&page=${page}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${whopApiKey}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (!membershipsResponse.ok) {
+            const errorText = await membershipsResponse.text();
+            console.error(`Error fetching memberships page ${page}:`, membershipsResponse.status, errorText);
+            break;
+          }
+          
+          const membershipsData = await membershipsResponse.json();
+          
+          // Handle different response structures
+          let pageMemberships = [];
+          if (Array.isArray(membershipsData)) {
+            pageMemberships = membershipsData;
+          } else if (Array.isArray(membershipsData.data)) {
+            pageMemberships = membershipsData.data;
+          } else if (membershipsData.memberships && Array.isArray(membershipsData.memberships)) {
+            pageMemberships = membershipsData.memberships;
+          }
+          
+          allMemberships = [...allMemberships, ...pageMemberships];
+          
+          // Check if there are more pages
+          const meta = membershipsData.meta || {};
+          const totalPages = meta.total_pages || meta.last_page || 1;
+          hasMorePages = page < totalPages;
+          page++;
+          
+          // Safety limit: don't fetch more than 10 pages
+          if (page > 10) break;
+        }
+        
+        // Return all memberships with key fields for inspection
+        const membershipSummary = allMemberships.map(m => ({
+          id: m.id,
+          membershipId: m.id,
+          email: m.email || m.user?.email || m.member?.email || 'no email',
+          userId: m.user?.id || m.member?.id || 'no user id',
+          status: m.status || 'no status',
+          created_at: m.created_at || 'no date',
+          expires_at: m.expires_at || 'no expiry',
+          product: m.product?.title || m.product?.name || 'no product',
+          productId: m.product?.id || 'no product id',
+          plan: m.plan?.name || 'no plan',
+          planId: m.plan?.id || 'no plan id',
+          planPrice: m.plan?.price || m.plan?.amount || 'no price',
+          // Include full membership object for deep inspection (limit size)
+          fullMembership: JSON.stringify(m).substring(0, 500)
+        }));
+        
+        return res.status(200).json({
+          totalMemberships: allMemberships.length,
+          memberships: membershipSummary,
+          sampleRawMembership: allMemberships[0] || null
+        });
+        
+      } catch (error) {
+        console.error('Error fetching all memberships:', error);
+        return res.status(500).json({ 
+          error: 'Failed to fetch memberships',
+          details: error.message 
+        });
+      }
+    }
     
     // If getAllPayments is true, return all payments for debugging
     if (getAllPayments) {
