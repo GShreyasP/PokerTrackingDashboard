@@ -956,6 +956,7 @@ async function canCreateTracker() {
         
         const userData = userDoc.data();
         const trackers = userData.trackers || [];
+        const totalTrackersCreated = userData.totalTrackersCreated || trackers.length; // Fallback to current count for existing users
         
         // Check subscription status (pass email for whitelist check)
         let subscriptionStatus = await getSubscriptionStatus(userId, userEmail);
@@ -976,21 +977,39 @@ async function canCreateTracker() {
                 const expiresAt = new Date(subscriptionStatus.expiresAt);
                 if (expiresAt < new Date()) {
                     // Subscription expired, treat as free user
-                    return { 
-                        canCreate: trackers.length < 2, 
-                        reason: trackers.length >= 2 ? 'Free tier limit reached. Upgrade to create more tables.' : null
-                    };
+                    // Check lifetime limit (3 total) and active limit (2 active)
+                    if (totalTrackersCreated >= 3) {
+                        return { 
+                            canCreate: false, 
+                            reason: 'You have reached your lifetime limit of 3 free tables. Subscribe to create unlimited tables.' 
+                        };
+                    }
+                    if (trackers.length >= 2) {
+                        return { 
+                            canCreate: false, 
+                            reason: 'You can only have 2 active tables at once. Delete a table or subscribe for unlimited tables.' 
+                        };
+                    }
+                    return { canCreate: true };
                 }
             }
             // Active subscription or whitelisted - unlimited trackers
             return { canCreate: true, subscriptionType: subscriptionStatus.subscriptionType || 'pro' };
         }
         
-        // Free tier: limit to 2 trackers
+        // Free tier: Check lifetime limit (3 total trackers ever created)
+        if (totalTrackersCreated >= 3) {
+            return { 
+                canCreate: false, 
+                reason: 'You have reached your lifetime limit of 3 free tables. Subscribe to create unlimited tables.' 
+            };
+        }
+        
+        // Free tier: Also check active limit (2 active trackers at once)
         if (trackers.length >= 2) {
             return { 
                 canCreate: false, 
-                reason: 'Free tier limit reached. Upgrade to create more tables.' 
+                reason: 'You can only have 2 active tables at once. Delete a table or subscribe for unlimited tables.' 
             };
         }
         
@@ -1124,6 +1143,8 @@ async function saveState() {
                 }
                 
                 const existingIndex = trackers.findIndex(t => t.id === state.trackerId);
+                const isNewTracker = existingIndex < 0;
+                
                 const trackerData = {
                     id: state.trackerId,
                     name: state.trackerName || `Table ${new Date().toLocaleDateString()}`,
@@ -1137,11 +1158,19 @@ async function saveState() {
                     trackers.push(trackerData);
                 }
                 
-                await docRef.set({
+                // If this is a new tracker, increment totalTrackersCreated
+                const updateData = {
                     state: stateToSave, // Keep for backward compatibility
                     trackers: trackers,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                }, { merge: true });
+                };
+                
+                if (isNewTracker) {
+                    const currentTotal = doc.exists ? (doc.data().totalTrackersCreated || trackers.length) : 0;
+                    updateData.totalTrackersCreated = currentTotal + 1;
+                }
+                
+                await docRef.set(updateData, { merge: true });
             } else {
                 // No tracker ID, just save state (backward compatibility)
                 await docRef.set({
@@ -1834,6 +1863,8 @@ async function startTracking() {
             
             // Check if tracker already exists, update it; otherwise add new
             const existingIndex = trackers.findIndex(t => t.id === state.trackerId);
+            const isNewTracker = existingIndex < 0;
+            
             const trackerData = {
                 id: state.trackerId,
                 name: state.trackerName,
@@ -1847,11 +1878,19 @@ async function startTracking() {
                 trackers.push(trackerData);
             }
             
-            // Save trackers array
-            await docRef.set({
+            // If this is a new tracker, increment totalTrackersCreated
+            const updateData = {
                 trackers: trackers,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
+            };
+            
+            if (isNewTracker) {
+                const currentTotal = doc.exists ? (doc.data().totalTrackersCreated || trackers.length) : 0;
+                updateData.totalTrackersCreated = currentTotal + 1;
+            }
+            
+            // Save trackers array and total count
+            await docRef.set(updateData, { merge: true });
             
             console.log('Tracker saved to trackers array');
         } catch (error) {
