@@ -89,6 +89,17 @@ async function initFirebase() {
                     }, 500);
                 }
                 
+                // Clean up expired trackers on login
+                if (window.cleanupExpiredTrackers) {
+                    setTimeout(async () => {
+                        try {
+                            await window.cleanupExpiredTrackers();
+                        } catch (error) {
+                            console.error('Error cleaning up expired trackers:', error);
+                        }
+                    }, 2000);
+                }
+                
                 // Show friends button and hamburger menu only after authenticated view is shown and auth page is hidden
                 // Use setTimeout to ensure auth page is hidden first
                 setTimeout(() => {
