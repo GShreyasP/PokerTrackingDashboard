@@ -2590,6 +2590,15 @@ function showSettlementOptions() {
     const endGameFromPlayer = document.getElementById('end-game-from-player');
     if (endGameFromHouse) endGameFromHouse.classList.add('hidden');
     if (endGameFromPlayer) endGameFromPlayer.classList.add('hidden');
+    // Show "Back to Tracker" button only in end game flow
+    const backToTrackerBtn = document.getElementById('back-to-tracker-btn');
+    if (backToTrackerBtn) {
+        if (isEndGameFlow) {
+            backToTrackerBtn.classList.remove('hidden');
+        } else {
+            backToTrackerBtn.classList.add('hidden');
+        }
+    }
 }
 
 function showHouseSettlement() {
@@ -2747,6 +2756,11 @@ function showPlayerToPlayerSettlement() {
 
 function backToSettlementOptions() {
     showSettlementOptions();
+}
+
+function backToTracker() {
+    // Close the settlement modal and return to tracker
+    closeSettlementModal();
 }
 
 function confirmEndGame() {
@@ -5411,6 +5425,7 @@ window.closeSettlementModal = closeSettlementModal;
 window.showHouseSettlement = showHouseSettlement;
 window.showPlayerToPlayerSettlement = showPlayerToPlayerSettlement;
 window.backToSettlementOptions = backToSettlementOptions;
+window.backToTracker = backToTracker;
 window.confirmEndGame = confirmEndGame;
 window.signInWithGoogle = signInWithGoogle;
 window.signOut = signOut;
