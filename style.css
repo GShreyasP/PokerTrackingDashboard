@@ -2348,6 +2348,19 @@ h3 {
     font-weight: 500;
 }
 
+.settlement-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.settlement-actions .btn {
+    flex: 1;
+    max-width: 200px;
+}
+
 .btn-back {
     background: #6c757d;
     color: white;

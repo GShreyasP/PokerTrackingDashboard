@@ -1,4 +1,4 @@
-# Poker Money Tracker
+# SettleUP
 
 A web application for tracking poker money and chips during a game session. Track balances, manage chips, and monitor transactions in real-time.
 

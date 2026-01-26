@@ -2538,21 +2538,58 @@ async function clearTable() {
 }
 
 // Settlement functions
+// Track if settlement modal is opened from "End Game" button
+let isEndGameFlow = false;
+
 function showSettlementModal() {
+    isEndGameFlow = false;
     const modal = document.getElementById('settlement-modal');
     modal.classList.remove('hidden');
+    // Show "Back to Dashboard" button in normal flow
+    const backToDashboardBtn = document.getElementById('back-to-dashboard-btn');
+    if (backToDashboardBtn) {
+        backToDashboardBtn.classList.remove('hidden');
+    }
+    showSettlementOptions();
+}
+
+function showSettlementModalForEndGame() {
+    isEndGameFlow = true;
+    const modal = document.getElementById('settlement-modal');
+    modal.classList.remove('hidden');
+    // Hide "Back to Dashboard" button in end game flow
+    const backToDashboardBtn = document.getElementById('back-to-dashboard-btn');
+    if (backToDashboardBtn) {
+        backToDashboardBtn.classList.add('hidden');
+    }
     showSettlementOptions();
 }
 
 function closeSettlementModal() {
+    isEndGameFlow = false;
     const modal = document.getElementById('settlement-modal');
     modal.classList.add('hidden');
+    // Hide end game buttons
+    const endGameFromHouse = document.getElementById('end-game-from-house');
+    const endGameFromPlayer = document.getElementById('end-game-from-player');
+    if (endGameFromHouse) endGameFromHouse.classList.add('hidden');
+    if (endGameFromPlayer) endGameFromPlayer.classList.add('hidden');
+    // Show "Back to Dashboard" button
+    const backToDashboardBtn = document.getElementById('back-to-dashboard-btn');
+    if (backToDashboardBtn) {
+        backToDashboardBtn.classList.remove('hidden');
+    }
 }
 
 function showSettlementOptions() {
     document.getElementById('settlement-options').classList.remove('hidden');
     document.getElementById('house-settlement-view').classList.add('hidden');
     document.getElementById('player-settlement-view').classList.add('hidden');
+    // Hide end game buttons when showing options
+    const endGameFromHouse = document.getElementById('end-game-from-house');
+    const endGameFromPlayer = document.getElementById('end-game-from-player');
+    if (endGameFromHouse) endGameFromHouse.classList.add('hidden');
+    if (endGameFromPlayer) endGameFromPlayer.classList.add('hidden');
 }
 
 function showHouseSettlement() {
@@ -2592,6 +2629,16 @@ function showHouseSettlement() {
         `;
         resultsDiv.appendChild(personDiv);
     });
+    
+    // Show "End Game" button if in end game flow
+    const endGameBtn = document.getElementById('end-game-from-house');
+    if (endGameBtn) {
+        if (isEndGameFlow) {
+            endGameBtn.classList.remove('hidden');
+        } else {
+            endGameBtn.classList.add('hidden');
+        }
+    }
 }
 
 function showPlayerToPlayerSettlement() {
@@ -2686,10 +2733,27 @@ function showPlayerToPlayerSettlement() {
         `;
         resultsDiv.appendChild(paymentsDiv);
     });
+    
+    // Show "End Game" button if in end game flow
+    const endGameBtn = document.getElementById('end-game-from-player');
+    if (endGameBtn) {
+        if (isEndGameFlow) {
+            endGameBtn.classList.remove('hidden');
+        } else {
+            endGameBtn.classList.add('hidden');
+        }
+    }
 }
 
 function backToSettlementOptions() {
     showSettlementOptions();
+}
+
+function confirmEndGame() {
+    // Close the settlement modal first
+    closeSettlementModal();
+    // Then delete the table
+    deleteCurrentTable();
 }
 
 // ==================== FRIENDS SYSTEM ====================
@@ -5342,10 +5406,12 @@ window.hideAddPersonForm = hideAddPersonForm;
 window.submitAddPerson = submitAddPerson;
 window.togglePersonalLog = togglePersonalLog;
 window.showSettlementModal = showSettlementModal;
+window.showSettlementModalForEndGame = showSettlementModalForEndGame;
 window.closeSettlementModal = closeSettlementModal;
 window.showHouseSettlement = showHouseSettlement;
 window.showPlayerToPlayerSettlement = showPlayerToPlayerSettlement;
 window.backToSettlementOptions = backToSettlementOptions;
+window.confirmEndGame = confirmEndGame;
 window.signInWithGoogle = signInWithGoogle;
 window.signOut = signOut;
 window.loginWithEmail = loginWithEmail;

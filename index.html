@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- App Icon for Home Screen -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <title>Poker Money Tracker</title>
+    <title>SettleUP</title>
     <link rel="stylesheet" href="/style.css">
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -87,7 +87,7 @@
                     <line x1="3" y1="18" x2="21" y2="18"/>
                 </svg>
             </button>
-            <h1>Poker <span>Money Tracker</span></h1>
+            <h1>SettleUP</h1>
             <div class="header-actions-right">
                 <button id="install-app-btn" class="btn btn-install" onclick="showInstallInstructions()">Install App</button>
                 <button id="notifications-btn" class="btn btn-notifications hidden" onclick="toggleNotificationsSidebar()">
@@ -467,7 +467,7 @@
                 <div class="header-actions">
                     <button id="settlement-btn" class="btn btn-settlement" onclick="showSettlementModal()">Settlement</button>
                     <button id="add-person-btn" class="btn btn-add-person" onclick="showAddPersonForm()">+ Add Person</button>
-                    <button id="reset-btn" class="btn btn-reset" onclick="deleteCurrentTable()">End Game</button>
+                    <button id="reset-btn" class="btn btn-reset" onclick="showSettlementModalForEndGame()">End Game</button>
                 </div>
             </div>
             
@@ -498,16 +498,22 @@
                 <div id="house-settlement-view" class="settlement-view hidden">
                     <h2>House Settlement</h2>
                     <div id="house-settlement-results"></div>
-                    <button class="btn btn-back" onclick="backToSettlementOptions()">Back</button>
+                    <div class="settlement-actions">
+                        <button class="btn btn-back" onclick="backToSettlementOptions()">Back</button>
+                        <button id="end-game-from-house" class="btn btn-reset hidden" onclick="confirmEndGame()">End Game</button>
+                    </div>
                 </div>
                 
                 <div id="player-settlement-view" class="settlement-view hidden">
                     <h2>Player to Player Settlement</h2>
                     <div id="player-settlement-results"></div>
-                    <button class="btn btn-back" onclick="backToSettlementOptions()">Back</button>
+                    <div class="settlement-actions">
+                        <button class="btn btn-back" onclick="backToSettlementOptions()">Back</button>
+                        <button id="end-game-from-player" class="btn btn-reset hidden" onclick="confirmEndGame()">End Game</button>
+                    </div>
                 </div>
                 
-                <button class="btn btn-close-modal" onclick="closeSettlementModal()">Back to Dashboard</button>
+                <button id="back-to-dashboard-btn" class="btn btn-close-modal" onclick="closeSettlementModal()">Back to Dashboard</button>
             </div>
         </div>
         

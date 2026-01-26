@@ -1,5 +1,5 @@
 {
-  "name": "poker-money-tracker",
+  "name": "settleup",
   "version": "1.0.0",
   "description": "A web application for tracking poker money and chips during game sessions",
   "main": "index.html",
