@@ -145,31 +145,77 @@ export default async function handler(req, res) {
     let subscriptionType = 'monthly'; // default
     let isOneTimePayment = isPaypPurchase; // If found in PAYP product, it's one-time
     
+    // Check for PAYP based on plan price ($1) and reason ("one time payment")
+    // This is the most reliable way to identify PAYP users
+    const planPrice = matchingMembership.plan?.price || matchingMembership.plan?.amount || matchingMembership.price || matchingMembership.amount;
+    const reason = (matchingMembership.reason || '').toLowerCase();
+    const planName = (matchingMembership.plan?.name || '').toLowerCase();
+    
+    // Check if plan price is $1 and reason is "one time payment"
+    const isPaypByPriceAndReason = (
+      (planPrice === 1 || planPrice === 1.00 || planPrice === '$1' || planPrice === '$1.00' || 
+       String(planPrice).includes('1.00') || String(planPrice).replace(/[^0-9.]/g, '') === '1') &&
+      (reason.includes('one time payment') || reason.includes('one-time payment'))
+    );
+    
     if (matchingMembership.plan) {
       const planId = matchingMembership.plan.id || '';
-      const planName = (matchingMembership.plan.name || '').toLowerCase();
       const planType = matchingMembership.plan.plan_type || '';
       
-      // Check if this is the PAYP one-time payment plan
-      // PAYP plan ID: plan_AYljP0LPlsikE
-      if (planId === 'plan_AYljP0LPlsikE' || planName.includes('pay as you play') || planName.includes('one-time') || planType === 'one_time') {
+      // Primary check: Plan price is $1 AND reason is "one time payment" = PAYP
+      if (isPaypByPriceAndReason) {
         subscriptionType = 'payp';
         isOneTimePayment = true;
-      } else if (planId === 'plan_8MBIgfX4XvYFw' || planName.includes('6 month') || planName.includes('6-month') || planName.includes('6mo')) {
+      }
+      // Secondary check: PAYP plan ID
+      else if (planId === 'plan_AYljP0LPlsikE') {
+        subscriptionType = 'payp';
+        isOneTimePayment = true;
+      }
+      // Tertiary check: Plan name contains PAYP keywords
+      else if (planName.includes('pay as you play') || planName.includes('one-time') || planName.includes('payp')) {
+        subscriptionType = 'payp';
+        isOneTimePayment = true;
+      }
+      // Check for 6-month subscription
+      else if (planId === 'plan_8MBIgfX4XvYFw' || planName.includes('6 month') || planName.includes('6-month') || planName.includes('6mo')) {
         subscriptionType = '6month';
-      } else if (planId === 'plan_N6mSBFXV8ozrH' || planName.includes('monthly') || planName.includes('month')) {
+      }
+      // Check for monthly subscription
+      else if (planId === 'plan_N6mSBFXV8ozrH' || planName.includes('monthly') || planName.includes('month')) {
         subscriptionType = 'monthly';
       }
       
       // Also check if it's a one-time payment by looking at billing/recurring fields
-      // One-time payments typically don't have recurring billing
-      if (!matchingMembership.recurring || matchingMembership.billing_type === 'one_time' || planType === 'one_time') {
-        if (!isOneTimePayment) {
-          isOneTimePayment = true;
-          subscriptionType = 'payp';
+      // But only if we haven't already identified it as PAYP
+      if (!isOneTimePayment) {
+        if (!matchingMembership.recurring || matchingMembership.billing_type === 'one_time' || planType === 'one_time') {
+          // If price is $1, it's likely PAYP even without explicit reason
+          if (planPrice === 1 || planPrice === 1.00 || planPrice === '$1' || planPrice === '$1.00' || 
+              String(planPrice).includes('1.00') || String(planPrice).replace(/[^0-9.]/g, '') === '1') {
+            subscriptionType = 'payp';
+            isOneTimePayment = true;
+          }
         }
       }
+    } else {
+      // No plan object, but check membership-level fields
+      if (isPaypByPriceAndReason) {
+        subscriptionType = 'payp';
+        isOneTimePayment = true;
+      }
     }
+    
+    // Log for debugging (remove in production or make conditional)
+    console.log('Whop membership check:', {
+      planPrice,
+      reason,
+      planName: matchingMembership.plan?.name,
+      planId: matchingMembership.plan?.id,
+      isPaypByPriceAndReason,
+      subscriptionType,
+      isOneTimePayment
+    });
     
     return res.status(200).json({
       hasSubscription: true,
