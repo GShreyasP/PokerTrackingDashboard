@@ -749,6 +749,9 @@ async function updateSubscriptionStatus(userId, subscriptionData) {
             subscriptionExpiresAt: subscriptionData.expiresAt || null,
             subscriptionLastChecked: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
+        
+        // Update plan display after updating status
+        updatePlanDisplay(subscriptionData);
     } catch (error) {
         console.error('Error updating subscription status:', error);
     }
@@ -769,10 +772,86 @@ async function refreshSubscriptionStatus() {
     if (subscriptionData) {
         // Update Firestore with latest status
         await updateSubscriptionStatus(userId, subscriptionData);
+        // Update plan display
+        updatePlanDisplay(subscriptionData);
         return subscriptionData;
     }
     
+    // Update plan display even if no subscription data (show Free Tier)
+    updatePlanDisplay({ hasSubscription: false });
     return null;
+}
+
+// Get plan name from subscription status
+function getPlanName(subscriptionStatus) {
+    if (!subscriptionStatus || !subscriptionStatus.hasSubscription) {
+        return 'Free Tier';
+    }
+    
+    // Check if subscription is expired
+    if (subscriptionStatus.expiresAt) {
+        const expiresAt = new Date(subscriptionStatus.expiresAt);
+        if (expiresAt < new Date()) {
+            return 'Free Tier';
+        }
+    }
+    
+    // Determine plan type
+    const subscriptionType = subscriptionStatus.subscriptionType;
+    if (subscriptionType === '6month' || subscriptionType === 'monthly') {
+        return 'Pro Plan';
+    }
+    
+    // Default to Pro Plan for any active subscription
+    return 'Pro Plan';
+}
+
+// Update plan display in header
+function updatePlanDisplay(subscriptionStatus) {
+    const planBadge = document.getElementById('user-plan-badge');
+    if (!planBadge) {
+        return;
+    }
+    
+    const planName = getPlanName(subscriptionStatus);
+    planBadge.textContent = planName;
+    
+    // Set data attribute for styling
+    if (planName === 'Free Tier') {
+        planBadge.setAttribute('data-plan', 'free');
+    } else if (planName === 'Pro Plan') {
+        planBadge.setAttribute('data-plan', 'pro');
+    } else if (planName === 'PAYP Plan') {
+        planBadge.setAttribute('data-plan', 'payp');
+    }
+    
+    // Show badge if user is authenticated
+    if (window.currentUser) {
+        planBadge.classList.remove('hidden');
+    } else {
+        planBadge.classList.add('hidden');
+    }
+}
+
+// Load and display plan status
+async function loadPlanDisplay() {
+    if (!window.currentUser) {
+        const planBadge = document.getElementById('user-plan-badge');
+        if (planBadge) {
+            planBadge.classList.add('hidden');
+        }
+        return;
+    }
+    
+    const userId = window.currentUser.uid;
+    const subscriptionStatus = await getSubscriptionStatus(userId);
+    
+    if (subscriptionStatus) {
+        updatePlanDisplay(subscriptionStatus);
+    } else {
+        // Default to Free Tier if no status found
+        updatePlanDisplay({ hasSubscription: false });
+    }
 }
 
 // Check if user can create more trackers
@@ -6306,6 +6385,8 @@ window.handleSixMonthSubscription = handleSixMonthSubscription;
 window.checkWhopSubscriptionStatus = checkWhopSubscriptionStatus;
 window.refreshSubscriptionStatus = refreshSubscriptionStatus;
 window.canCreateTracker = canCreateTracker;
+window.updatePlanDisplay = updatePlanDisplay;
+window.loadPlanDisplay = loadPlanDisplay;
 window.deleteAnalyticsEntry = deleteAnalyticsEntry;
 window.clearTable = clearTable;
 window.selectPersonFromSearch = selectPersonFromSearch;

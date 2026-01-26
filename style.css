@@ -3958,3 +3958,54 @@ h3 {
         font-size: 40px;
     }
 }
+
+/* Plan Badge in Header */
+.plan-badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 12px;
+    margin-left: 8px;
+    vertical-align: middle;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(148, 163, 184, 0.2);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.plan-badge:not(.hidden) {
+    display: inline-block;
+}
+
+.page-header h1 .plan-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+}
+
+/* Plan Badge Colors */
+.plan-badge:contains("Free Tier") {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+    border-color: rgba(148, 163, 184, 0.3);
+}
+
+/* Use data attribute for styling instead */
+.plan-badge[data-plan="free"] {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+    border-color: rgba(148, 163, 184, 0.3);
+}
+
+.plan-badge[data-plan="pro"] {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+    color: #a5b4fc;
+    border-color: rgba(102, 126, 234, 0.4);
+}
+
+.plan-badge[data-plan="payp"] {
+    background: rgba(16, 185, 129, 0.15);
+    color: #6ee7b7;
+    border-color: rgba(16, 185, 129, 0.3);
+}

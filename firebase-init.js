@@ -78,6 +78,17 @@ async function initFirebase() {
                     }, 1000);
                 }
                 
+                // Load plan display
+                if (window.loadPlanDisplay) {
+                    setTimeout(async () => {
+                        try {
+                            await window.loadPlanDisplay();
+                        } catch (error) {
+                            console.error('Error loading plan display:', error);
+                        }
+                    }, 500);
+                }
+                
                 // Show friends button and hamburger menu only after authenticated view is shown and auth page is hidden
                 // Use setTimeout to ensure auth page is hidden first
                 setTimeout(() => {
