@@ -833,7 +833,12 @@ async function updateSubscriptionStatus(userId, subscriptionData) {
 
 // Sync credits based on PAYP payment count
 async function syncPaypCredits(userId, paypPaymentCount) {
-    if (!window.firebaseDb || !userId || !paypPaymentCount) {
+    if (!window.firebaseDb || !userId) {
+        return;
+    }
+    
+    // If no payment count provided, return (don't sync)
+    if (!paypPaymentCount || paypPaymentCount === 0) {
         return;
     }
     
@@ -869,10 +874,67 @@ async function syncPaypCredits(userId, paypPaymentCount) {
                 if (creditsDisplay && !creditsDisplay.textContent.includes('Unlimited')) {
                     creditsDisplay.textContent = newCredits;
                 }
+                
+                return { added: creditsToAdd, total: newCredits };
+            } else {
+                console.log(`PAYP credits already synced. Current: ${currentCredits}, Expected from PAYP: ${expectedCreditsFromPayp}, Already have: ${creditsFromPayp}`);
             }
         }
     } catch (error) {
         console.error('Error syncing PAYP credits:', error);
+    }
+    
+    return null;
+}
+
+// Manual refresh credits function (for settings page button)
+async function refreshCredits() {
+    if (!window.currentUser || !window.firebaseDb) {
+        showAlertModal('Please sign in to refresh credits.');
+        return;
+    }
+    
+    const userId = window.currentUser.uid;
+    const userEmail = window.currentUser.email;
+    
+    try {
+        // Show loading state
+        const refreshBtn = document.getElementById('refresh-credits-btn');
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = 'Refreshing...';
+        }
+        
+        // Refresh subscription status (this will sync credits)
+        const subscriptionData = await refreshSubscriptionStatus();
+        
+        if (subscriptionData && (subscriptionData.subscriptionType === 'payp' || subscriptionData.isOneTimePayment)) {
+            const paypPaymentCount = subscriptionData.paypPaymentCount || 0;
+            if (paypPaymentCount > 0) {
+                const result = await syncPaypCredits(userId, paypPaymentCount);
+                if (result && result.added > 0) {
+                    showAlertModal(`Credits refreshed! Added ${result.added} credit(s). You now have ${result.total} credits.`);
+                } else {
+                    showAlertModal('Credits are up to date. No changes needed.');
+                }
+            } else {
+                showAlertModal('No PAYP payments found. If you just made a payment, please wait a moment and try again.');
+            }
+        } else {
+            // Reload settings to update display
+            await loadSettingsData();
+            showAlertModal('Credits refreshed!');
+        }
+    } catch (error) {
+        console.error('Error refreshing credits:', error);
+        showAlertModal('Error refreshing credits. Please try again.');
+    } finally {
+        // Restore button state
+        const refreshBtn = document.getElementById('refresh-credits-btn');
+        if (refreshBtn) {
+            refreshBtn.disabled = false;
+            refreshBtn.textContent = 'Refresh Credits';
+        }
     }
 }
 
@@ -956,14 +1018,19 @@ async function refreshSubscriptionStatus() {
         // Initialize credits for all users
         await initializeCredits(userId);
         
-        // Sync credits based on PAYP payment count (handles multiple payments)
+        // Always sync credits for PAYP users based on payment count (handles multiple payments)
         if (subscriptionData.subscriptionType === 'payp' || subscriptionData.isOneTimePayment) {
             const paypPaymentCount = subscriptionData.paypPaymentCount || 0;
             if (paypPaymentCount > 0) {
                 await syncPaypCredits(userId, paypPaymentCount);
             } else {
-                // Fallback: if payment count not available, use old method
-                await addPaypCredit(userId);
+                // Fallback: if payment count not available, check if user just got PAYP
+                const oldStatus = await getSubscriptionStatus(userId, userEmail);
+                const wasPayp = oldStatus?.subscriptionType === 'payp' || oldStatus?.isOneTimePayment;
+                if (!wasPayp) {
+                    // User just got PAYP, add 1 credit
+                    await addPaypCredit(userId);
+                }
             }
         }
         
@@ -7069,6 +7136,7 @@ window.cleanupExpiredTrackers = cleanupExpiredTrackers;
 window.markTrackersForExpiration = markTrackersForExpiration;
 window.closeConfirmModal = closeConfirmModal;
 window.confirmCreateTracker = confirmCreateTracker;
+window.refreshCredits = refreshCredits;
 window.clearTable = clearTable;
 window.selectPersonFromSearch = selectPersonFromSearch;
 window.updateTrackerNameMain = updateTrackerNameMain;
