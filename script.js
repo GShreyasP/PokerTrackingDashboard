@@ -725,6 +725,7 @@ async function showSetupSection() {
     const trackingSection = document.getElementById('tracking-section');
     const settingsPage = document.getElementById('settings-page');
     const analyticsPage = document.getElementById('analytics-page');
+    const upgradePage = document.getElementById('upgrade-page');
     // Hide all other pages with inline styles
     if (mainScreen) {
         mainScreen.classList.add('hidden');
@@ -737,6 +738,10 @@ async function showSetupSection() {
     if (analyticsPage) {
         analyticsPage.classList.add('hidden');
         analyticsPage.style.display = 'none';
+    }
+    if (upgradePage) {
+        upgradePage.classList.add('hidden');
+        upgradePage.style.display = 'none';
     }
     if (setupSection) {
         setupSection.classList.remove('hidden');
@@ -1546,6 +1551,7 @@ async function startTracking() {
     // Hide setup and main screen, show tracking
     const settingsPage = document.getElementById('settings-page');
     const analyticsPage = document.getElementById('analytics-page');
+    const upgradePage = document.getElementById('upgrade-page');
     
     // Hide all other pages with inline styles
     if (mainScreen) {
@@ -1563,6 +1569,10 @@ async function startTracking() {
     if (analyticsPage) {
         analyticsPage.classList.add('hidden');
         analyticsPage.style.display = 'none';
+    }
+    if (upgradePage) {
+        upgradePage.classList.add('hidden');
+        upgradePage.style.display = 'none';
     }
     if (trackingSection) {
         trackingSection.classList.remove('hidden');
@@ -2837,6 +2847,7 @@ async function showSettingsPage() {
     const setupSection = document.getElementById('setup-section');
     const trackingSection = document.getElementById('tracking-section');
     const analyticsPage = document.getElementById('analytics-page');
+    const upgradePage = document.getElementById('upgrade-page');
     
     // Hide all other pages with inline styles for robustness
     if (mainScreen) {
@@ -2854,6 +2865,10 @@ async function showSettingsPage() {
     if (analyticsPage) {
         analyticsPage.classList.add('hidden');
         analyticsPage.style.display = 'none';
+    }
+    if (upgradePage) {
+        upgradePage.classList.add('hidden');
+        upgradePage.style.display = 'none';
     }
     
     // Show settings page with inline style to ensure visibility
