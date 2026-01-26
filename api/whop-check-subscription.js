@@ -136,12 +136,44 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Whop API not configured' });
     }
     
-    // SIMPLIFIED APPROACH: Just check payments by email and total spend
-    let allPayments = [];
+    // APPROACH: Check memberships first (they have email), then match payments by membership ID
+    let userMembershipIds = [];
     let userPayments = [];
     
     try {
-      // Fetch all payments with pagination
+      // Step 1: Find user's memberships by email (memberships have email, payments don't)
+      const membershipsResponse = await fetch(`https://api.whop.com/api/v2/memberships`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${whopApiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (membershipsResponse.ok) {
+        const membershipsData = await membershipsResponse.json();
+        const allMemberships = Array.isArray(membershipsData) 
+          ? membershipsData 
+          : (Array.isArray(membershipsData.data) ? membershipsData.data : []);
+        
+        // Find memberships matching this email
+        const userMemberships = allMemberships.filter(membership => {
+          const memEmail = (membership.email || membership.user?.email || membership.member?.email || '').toLowerCase().trim();
+          const authUsername = authenticatedEmail.split('@')[0];
+          const memUsername = memEmail.split('@')[0];
+          
+          // Exact match or username match (handles typos)
+          return memEmail === authenticatedEmail || authUsername === memUsername;
+        });
+        
+        // Extract membership IDs
+        userMembershipIds = userMemberships.map(m => m.id).filter(Boolean);
+        
+        console.log(`Found ${userMemberships.length} memberships for ${authenticatedEmail}`);
+        console.log(`Membership IDs:`, userMembershipIds);
+      }
+      
+      // Step 2: Fetch all payments and match by membership ID
       let page = 1;
       let hasMorePages = true;
       
@@ -172,7 +204,13 @@ export default async function handler(req, res) {
           pagePayments = paymentsData.payments;
         }
         
-        allPayments = [...allPayments, ...pagePayments];
+        // Filter payments by membership ID
+        const matchingPayments = pagePayments.filter(payment => {
+          const paymentMembershipId = payment.membership_id || payment.membership?.id;
+          return paymentMembershipId && userMembershipIds.includes(paymentMembershipId);
+        });
+        
+        userPayments = [...userPayments, ...matchingPayments];
         
         // Check if there are more pages
         const meta = paymentsData.meta || {};
@@ -184,25 +222,12 @@ export default async function handler(req, res) {
         if (page > 10) break;
       }
       
-      console.log(`Fetched ${allPayments.length} total payments from Whop`);
-      
-      // Filter payments for this user by email
-      // Handle email variations (kavishmu vs kavishnu, etc.)
-      userPayments = allPayments.filter(payment => {
-        const paymentEmail = (payment.user?.email || payment.email || '').toLowerCase().trim();
-        const authUsername = authenticatedEmail.split('@')[0];
-        const paymentUsername = paymentEmail.split('@')[0];
-        
-        // Exact match or username match (handles typos)
-        return paymentEmail === authenticatedEmail || authUsername === paymentUsername;
-      });
-      
-      console.log(`Found ${userPayments.length} payments for ${authenticatedEmail}`);
+      console.log(`Found ${userPayments.length} payments for ${authenticatedEmail} (matched by membership IDs)`);
       
     } catch (error) {
-      console.error('Error fetching payments:', error);
+      console.error('Error fetching memberships/payments:', error);
       return res.status(500).json({ 
-        error: 'Failed to fetch payments',
+        error: 'Failed to fetch memberships/payments',
         details: error.message 
       });
     }
@@ -227,13 +252,8 @@ export default async function handler(req, res) {
     let latestPayment = null;
     
     userPayments.forEach(payment => {
-      // Get payment amount from various possible fields
-      const amount = payment.amount || 
-                    payment.total || 
-                    payment.total_spend ||
-                    payment.plan?.price || 
-                    payment.plan?.amount || 
-                    0;
+      // Get payment amount - use 'amount' field as primary source
+      const amount = payment.amount || 0;
       
       // Normalize amount to number
       const normalizedAmount = typeof amount === 'number' 
