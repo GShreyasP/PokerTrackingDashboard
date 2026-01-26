@@ -821,6 +821,11 @@ async function refreshSubscriptionStatus() {
     const userId = window.currentUser.uid;
     const userEmail = window.currentUser.email;
     
+    // Get old subscription status to check if it just expired
+    const oldStatus = await getSubscriptionStatus(userId, userEmail);
+    const oldExpiresAt = oldStatus?.expiresAt ? new Date(oldStatus.expiresAt) : null;
+    const wasActive = oldStatus?.hasSubscription && (!oldExpiresAt || oldExpiresAt > new Date());
+    
     // Check if user is whitelisted first (async)
     const whitelisted = await isEmailWhitelisted(userEmail);
     if (whitelisted) {
@@ -839,16 +844,129 @@ async function refreshSubscriptionStatus() {
     const subscriptionData = await checkWhopSubscriptionStatus(userEmail);
     
     if (subscriptionData) {
+        // Check if subscription just expired
+        const newExpiresAt = subscriptionData.expiresAt ? new Date(subscriptionData.expiresAt) : null;
+        const isNowExpired = newExpiresAt && newExpiresAt < new Date();
+        const subscriptionJustExpired = wasActive && (!subscriptionData.hasSubscription || isNowExpired);
+        
         // Update Firestore with latest status
         await updateSubscriptionStatus(userId, subscriptionData);
+        
+        // If subscription just expired, mark all trackers for expiration
+        if (subscriptionJustExpired && !subscriptionData.isOneTimePayment) {
+            await markTrackersForExpiration(userId);
+        }
+        
         // Update plan display
         updatePlanDisplay(subscriptionData);
         return subscriptionData;
     }
     
+    // If we had an active subscription but now don't, subscription expired
+    if (wasActive && !oldStatus?.isWhitelisted) {
+        await markTrackersForExpiration(userId);
+    }
+    
     // Update plan display even if no subscription data (show Free Tier)
     updatePlanDisplay({ hasSubscription: false });
     return null;
+}
+
+// Mark all user's trackers for expiration (7 days from now)
+async function markTrackersForExpiration(userId) {
+    if (!window.firebaseDb || !userId) {
+        return;
+    }
+    
+    try {
+        const docRef = window.firebaseDb.collection('users').doc(userId);
+        const doc = await docRef.get();
+        
+        if (!doc.exists) {
+            return;
+        }
+        
+        const userData = doc.data();
+        const trackers = userData.trackers || [];
+        
+        if (trackers.length === 0) {
+            return;
+        }
+        
+        // Set expiration to 7 days from now for all trackers
+        const expirationDate = new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        
+        const updatedTrackers = trackers.map(tracker => ({
+            ...tracker,
+            expiresAt: expirationDate
+        }));
+        
+        await docRef.set({
+            trackers: updatedTrackers,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        
+        console.log('Marked all trackers for expiration after subscription expired');
+    } catch (error) {
+        console.error('Error marking trackers for expiration:', error);
+    }
+}
+
+// Clean up expired trackers
+async function cleanupExpiredTrackers() {
+    if (!window.firebaseDb || !window.currentUser) {
+        return;
+    }
+    
+    try {
+        const userId = window.currentUser.uid;
+        const docRef = window.firebaseDb.collection('users').doc(userId);
+        const doc = await docRef.get();
+        
+        if (!doc.exists) {
+            return;
+        }
+        
+        const userData = doc.data();
+        const trackers = userData.trackers || [];
+        
+        if (trackers.length === 0) {
+            return;
+        }
+        
+        const now = new Date();
+        const activeTrackers = trackers.filter(tracker => {
+            // Keep trackers that don't have expiration or haven't expired yet
+            if (!tracker.expiresAt) {
+                return true;
+            }
+            
+            const expiresAt = new Date(tracker.expiresAt);
+            return expiresAt > now;
+        });
+        
+        // Only update if we removed some trackers
+        if (activeTrackers.length < trackers.length) {
+            const deletedCount = trackers.length - activeTrackers.length;
+            console.log(`Cleaning up ${deletedCount} expired tracker(s)`);
+            
+            await docRef.set({
+                trackers: activeTrackers,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            
+            // If we were viewing a deleted tracker, go back to main screen
+            if (state.trackerId) {
+                const trackerStillExists = activeTrackers.some(t => t.id === state.trackerId);
+                if (!trackerStillExists) {
+                    console.log('Current tracker was deleted, returning to main screen');
+                    await showMainScreen();
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error cleaning up expired trackers:', error);
+    }
 }
 
 // Get plan name from subscription status
@@ -1152,12 +1270,63 @@ async function saveState() {
                 const existingIndex = trackers.findIndex(t => t.id === state.trackerId);
                 const isNewTracker = existingIndex < 0;
                 
+                // Get subscription status to determine expiration
+                const userEmail = window.currentUser.email;
+                let subscriptionStatus = await getSubscriptionStatus(userId, userEmail);
+                
+                // Calculate expiration date
+                let expiresAt = null;
+                if (isNewTracker) {
+                    const now = new Date();
+                    
+                    // Check if user is PAYP (one-time payment)
+                    if (subscriptionStatus?.isOneTimePayment || subscriptionStatus?.subscriptionType === 'payp') {
+                        // PAYP users: expire 7 days from creation
+                        expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+                    } else if (subscriptionStatus?.hasSubscription && subscriptionStatus?.expiresAt) {
+                        // Subscription users: expire 7 days after subscription expires
+                        const subExpiresAt = new Date(subscriptionStatus.expiresAt);
+                        const expirationDate = new Date(subExpiresAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+                        expiresAt = expirationDate.toISOString();
+                    }
+                    // Free users: no expiration (they have lifetime limit instead)
+                } else {
+                    // For existing trackers, preserve existing expiration unless subscription just expired
+                    const existingTracker = trackers[existingIndex];
+                    expiresAt = existingTracker.expiresAt || null;
+                    
+                    // If subscription expired, update expiration to 7 days from now
+                    if (subscriptionStatus?.expiresAt) {
+                        const subExpiresAt = new Date(subscriptionStatus.expiresAt);
+                        if (subExpiresAt < new Date() && !subscriptionStatus?.isOneTimePayment) {
+                            // Subscription expired, set tracker to expire in 7 days
+                            expiresAt = new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+                        }
+                    }
+                }
+                
                 const trackerData = {
                     id: state.trackerId,
                     name: state.trackerName || `Table ${new Date().toLocaleDateString()}`,
                     state: stateToSave,
                     updatedAt: new Date().toISOString()
                 };
+                
+                // Add timestamps for new trackers
+                if (isNewTracker) {
+                    trackerData.createdAt = new Date().toISOString();
+                    if (expiresAt) {
+                        trackerData.expiresAt = expiresAt;
+                    }
+                } else if (expiresAt) {
+                    // Update expiration for existing tracker if needed
+                    trackerData.expiresAt = expiresAt;
+                    if (trackers[existingIndex].createdAt) {
+                        trackerData.createdAt = trackers[existingIndex].createdAt;
+                    }
+                } else if (trackers[existingIndex].createdAt) {
+                    trackerData.createdAt = trackers[existingIndex].createdAt;
+                }
                 
                 if (existingIndex >= 0) {
                     trackers[existingIndex] = trackerData;
@@ -1872,12 +2041,64 @@ async function startTracking() {
             const existingIndex = trackers.findIndex(t => t.id === state.trackerId);
             const isNewTracker = existingIndex < 0;
             
+            // Get subscription status to determine expiration
+            const userEmail = window.currentUser.email;
+            let subscriptionStatus = await getSubscriptionStatus(userId, userEmail);
+            
+            // Calculate expiration date
+            let expiresAt = null;
+            if (isNewTracker) {
+                const now = new Date();
+                const createdAt = now.toISOString();
+                
+                // Check if user is PAYP (one-time payment)
+                if (subscriptionStatus?.isOneTimePayment || subscriptionStatus?.subscriptionType === 'payp') {
+                    // PAYP users: expire 7 days from creation
+                    expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+                } else if (subscriptionStatus?.hasSubscription && subscriptionStatus?.expiresAt) {
+                    // Subscription users: expire 7 days after subscription expires
+                    const subExpiresAt = new Date(subscriptionStatus.expiresAt);
+                    const expirationDate = new Date(subExpiresAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+                    expiresAt = expirationDate.toISOString();
+                }
+                // Free users: no expiration (they have lifetime limit instead)
+            } else {
+                // For existing trackers, preserve existing expiration unless subscription just expired
+                const existingTracker = trackers[existingIndex];
+                expiresAt = existingTracker.expiresAt || null;
+                
+                // If subscription expired, update expiration to 7 days from now
+                if (subscriptionStatus?.expiresAt) {
+                    const subExpiresAt = new Date(subscriptionStatus.expiresAt);
+                    if (subExpiresAt < new Date() && !subscriptionStatus?.isOneTimePayment) {
+                        // Subscription expired, set tracker to expire in 7 days
+                        expiresAt = new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+                    }
+                }
+            }
+            
             const trackerData = {
                 id: state.trackerId,
                 name: state.trackerName,
                 state: prepareStateForFirestore(state),
                 updatedAt: new Date().toISOString()
             };
+            
+            // Add timestamps for new trackers
+            if (isNewTracker) {
+                trackerData.createdAt = new Date().toISOString();
+                if (expiresAt) {
+                    trackerData.expiresAt = expiresAt;
+                }
+            } else if (expiresAt) {
+                // Update expiration for existing tracker if needed
+                trackerData.expiresAt = expiresAt;
+                if (trackers[existingIndex].createdAt) {
+                    trackerData.createdAt = trackers[existingIndex].createdAt;
+                }
+            } else if (trackers[existingIndex].createdAt) {
+                trackerData.createdAt = trackers[existingIndex].createdAt;
+            }
             
             if (existingIndex >= 0) {
                 trackers[existingIndex] = trackerData;
@@ -6519,6 +6740,8 @@ window.canCreateTracker = canCreateTracker;
 window.updatePlanDisplay = updatePlanDisplay;
 window.loadPlanDisplay = loadPlanDisplay;
 window.deleteAnalyticsEntry = deleteAnalyticsEntry;
+window.cleanupExpiredTrackers = cleanupExpiredTrackers;
+window.markTrackersForExpiration = markTrackersForExpiration;
 window.clearTable = clearTable;
 window.selectPersonFromSearch = selectPersonFromSearch;
 window.updateTrackerNameMain = updateTrackerNameMain;
