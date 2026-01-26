@@ -970,30 +970,33 @@ async function canCreateTracker() {
             subscriptionStatus = await refreshSubscriptionStatus();
         }
         
-        // If user has active subscription or is whitelisted, allow unlimited trackers
+        // Active limit applies to ALL users (2 active trackers max) - DDoS protection
+        if (trackers.length >= 2) {
+            return { 
+                canCreate: false, 
+                reason: 'You can only have 2 active tables at once. Delete a table to create a new one.' 
+            };
+        }
+        
+        // If user has active subscription or is whitelisted, allow unlimited lifetime trackers
         if (subscriptionStatus?.hasSubscription || subscriptionStatus?.isWhitelisted) {
             // Check if subscription is expired (whitelisted users never expire)
             if (!subscriptionStatus.isWhitelisted && subscriptionStatus.expiresAt) {
                 const expiresAt = new Date(subscriptionStatus.expiresAt);
                 if (expiresAt < new Date()) {
                     // Subscription expired, treat as free user
-                    // Check lifetime limit (3 total) and active limit (2 active)
+                    // Check lifetime limit (3 total)
                     if (totalTrackersCreated >= 3) {
                         return { 
                             canCreate: false, 
                             reason: 'You have reached your lifetime limit of 3 free tables. Subscribe to create unlimited tables.' 
                         };
                     }
-                    if (trackers.length >= 2) {
-                        return { 
-                            canCreate: false, 
-                            reason: 'You can only have 2 active tables at once. Delete a table or subscribe for unlimited tables.' 
-                        };
-                    }
+                    // Active limit already checked above
                     return { canCreate: true };
                 }
             }
-            // Active subscription or whitelisted - unlimited trackers
+            // Active subscription or whitelisted - unlimited lifetime trackers (but still 2 active max)
             return { canCreate: true, subscriptionType: subscriptionStatus.subscriptionType || 'pro' };
         }
         
@@ -1005,13 +1008,7 @@ async function canCreateTracker() {
             };
         }
         
-        // Free tier: Also check active limit (2 active trackers at once)
-        if (trackers.length >= 2) {
-            return { 
-                canCreate: false, 
-                reason: 'You can only have 2 active tables at once. Delete a table or subscribe for unlimited tables.' 
-            };
-        }
+        // Active limit already checked above for all users
         
         return { canCreate: true };
     } catch (error) {
