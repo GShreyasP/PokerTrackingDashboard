@@ -193,7 +193,9 @@ export default async function handler(req, res) {
     // Check for PAYP based on plan price ($1) and reason ("one time payment")
     // This is the most reliable way to identify PAYP users
     // Check multiple possible locations for price and reason fields
-    const planPrice = matchingMembership.plan?.price || 
+    const planPrice = matchingPayment?.amount ||  // Payment amount is most reliable
+                     matchingPayment?.plan?.price ||
+                     matchingMembership.plan?.price || 
                      matchingMembership.plan?.amount || 
                      matchingMembership.plan?.initial_price ||
                      matchingMembership.plan?.renewal_price ||
