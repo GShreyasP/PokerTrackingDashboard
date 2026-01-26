@@ -226,7 +226,10 @@
         <!-- Main Screen (shown when authenticated but no tracker) -->
         <div id="main-screen" class="main-screen hidden">
             <div class="main-screen-content">
-                <div id="tracker-limit-error" class="tracker-limit-error hidden"></div>
+                <div id="tracker-limit-error" class="tracker-limit-error hidden">
+                    <span id="tracker-limit-error-message"></span>
+                    <button id="tracker-limit-upgrade-btn" class="tracker-limit-upgrade-btn hidden" onclick="toggleSidebarMenu(); showUpgradePage(); return false;">Upgrade Now</button>
+                </div>
                 
                 <!-- Your Tables Section -->
                 <section class="your-tables-section" style="margin-bottom: 48px;">

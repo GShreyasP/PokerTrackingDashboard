@@ -1118,7 +1118,7 @@ h3 {
 .tracker-limit-error {
     background: #f8d7da;
     color: #721c24;
-    padding: 12px 20px;
+    padding: 16px 20px;
     border-radius: 8px;
     margin-top: 15px;
     margin-bottom: 20px;
@@ -1126,6 +1126,36 @@ h3 {
     border-left: 4px solid #dc3545;
     text-align: center;
     font-weight: 500;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.tracker-limit-error #tracker-limit-error-message {
+    display: block;
+}
+
+.tracker-limit-upgrade-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 0.95em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.tracker-limit-upgrade-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.tracker-limit-upgrade-btn:active {
+    transform: translateY(0);
 }
 
 /* Section styles now handled by .section-title and .tables-grid */

@@ -1154,9 +1154,20 @@ async function showSetupSection() {
     if (!canCreate.canCreate) {
         // Show error message
         const errorDiv = document.getElementById('tracker-limit-error');
-        if (errorDiv) {
-            errorDiv.textContent = canCreate.reason || 'Upgrade to the next tier to create more tables';
+        const errorMessage = document.getElementById('tracker-limit-error-message');
+        const upgradeBtn = document.getElementById('tracker-limit-upgrade-btn');
+        
+        if (errorDiv && errorMessage) {
+            const reason = canCreate.reason || 'Upgrade to the next tier to create more tables';
+            errorMessage.textContent = reason;
             errorDiv.classList.remove('hidden');
+            
+            // Show upgrade button if it's the lifetime limit error
+            if (reason.includes('lifetime limit') && upgradeBtn) {
+                upgradeBtn.classList.remove('hidden');
+            } else if (upgradeBtn) {
+                upgradeBtn.classList.add('hidden');
+            }
         }
         return;
     }
