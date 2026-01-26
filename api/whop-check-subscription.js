@@ -65,11 +65,17 @@ export default async function handler(req, res) {
     }
     
     // Check memberships for the user by email across all products
-    // First try to get memberships by email (if API supports it)
-    // Otherwise, check both subscription product and PAYP product
+    // Also fetch payments to get the "reason" field
     
     let matchingMembership = null;
+    let matchingPayment = null;
     let isPaypPurchase = false;
+    
+    // Helper function to check if membership matches email
+    const membershipMatchesEmail = (membership) => {
+      const email = membership.email || membership.user?.email || membership.member?.email || '';
+      return email.toLowerCase() === authenticatedEmail;
+    };
     
     // Check subscription product first
     if (whopProductId) {
@@ -83,9 +89,9 @@ export default async function handler(req, res) {
       
       if (membershipsResponse.ok) {
         const membershipsData = await membershipsResponse.json();
-        matchingMembership = membershipsData.data?.find(membership => {
-          return membership.email?.toLowerCase() === authenticatedEmail;
-        });
+        matchingMembership = membershipsData.data?.find(membershipMatchesEmail);
+      } else {
+        console.error('Error fetching memberships:', membershipsResponse.status, await membershipsResponse.text());
       }
     }
     
@@ -101,9 +107,7 @@ export default async function handler(req, res) {
       
       if (paypMembershipsResponse.ok) {
         const paypMembershipsData = await paypMembershipsResponse.json();
-        const paypMembership = paypMembershipsData.data?.find(membership => {
-          return membership.email?.toLowerCase() === authenticatedEmail;
-        });
+        const paypMembership = paypMembershipsData.data?.find(membershipMatchesEmail);
         
         if (paypMembership) {
           matchingMembership = paypMembership;
@@ -112,12 +116,53 @@ export default async function handler(req, res) {
       }
     }
     
-    // If still not found, try checking by plan ID (PAYP plan: plan_AYljP0LPlsikE)
-    // We can also check all memberships and filter by email
+    // If still not found, try fetching all memberships (without product filter)
+    // This is a fallback in case PAYP is in a different product
     if (!matchingMembership) {
-      // Try to get all memberships and search by email
-      // Note: This might require checking multiple products or using a different endpoint
-      // For now, we'll rely on the product-specific checks above
+      try {
+        const allMembershipsResponse = await fetch(`https://api.whop.com/api/v2/memberships`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${whopApiKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (allMembershipsResponse.ok) {
+          const allMembershipsData = await allMembershipsResponse.json();
+          matchingMembership = allMembershipsData.data?.find(membershipMatchesEmail);
+          
+          // If found, check if it's PAYP by plan ID
+          if (matchingMembership && matchingMembership.plan?.id === 'plan_AYljP0LPlsikE') {
+            isPaypPurchase = true;
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching all memberships:', error);
+      }
+    }
+    
+    // Fetch payments to get the "reason" field
+    // Payments contain the reason field that shows "One time payment"
+    try {
+      const paymentsResponse = await fetch(`https://api.whop.com/api/v2/payments`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${whopApiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (paymentsResponse.ok) {
+        const paymentsData = await paymentsResponse.json();
+        // Find payment for this user
+        matchingPayment = paymentsData.data?.find(payment => {
+          const paymentEmail = payment.user?.email || payment.email || '';
+          return paymentEmail.toLowerCase() === authenticatedEmail;
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching payments:', error);
     }
     
     if (!matchingMembership) {
@@ -155,7 +200,9 @@ export default async function handler(req, res) {
                      matchingMembership.price || 
                      matchingMembership.amount;
     
-    const reason = (matchingMembership.reason || 
+    // Get reason from payment object (most reliable source)
+    const reason = (matchingPayment?.reason || 
+                   matchingMembership.reason || 
                    matchingMembership.payment?.reason ||
                    matchingMembership.plan?.reason || '').toLowerCase();
     
@@ -228,6 +275,11 @@ export default async function handler(req, res) {
     
     // Log for debugging (remove in production or make conditional)
     console.log('Whop membership check:', {
+      authenticatedEmail,
+      membershipFound: !!matchingMembership,
+      paymentFound: !!matchingPayment,
+      membershipEmail: matchingMembership?.email || matchingMembership?.user?.email || matchingMembership?.member?.email,
+      paymentEmail: matchingPayment?.user?.email || matchingPayment?.email,
       planPrice,
       normalizedPrice,
       reason,
@@ -236,7 +288,10 @@ export default async function handler(req, res) {
       isPaypByPriceAndReason,
       isOneDollar,
       subscriptionType,
-      isOneTimePayment
+      isOneTimePayment,
+      membershipStatus: matchingMembership?.status,
+      membershipData: JSON.stringify(matchingMembership, null, 2).substring(0, 500),
+      paymentData: matchingPayment ? JSON.stringify(matchingPayment, null, 2).substring(0, 500) : 'No payment found'
     });
     
     return res.status(200).json({
