@@ -196,10 +196,26 @@ export default async function handler(req, res) {
           plan: p.plan?.name || 'no plan'
         }));
         
-        console.log('=== ALL PAYMENTS DEBUG (first 20) ===');
+        console.log('=== ALL PAYMENTS DEBUG ===');
         console.log('Total payments found:', allPayments.length);
         console.log('Authenticated email:', authenticatedEmail);
-        console.log('Sample payments:', JSON.stringify(allPaymentsDebug, null, 2));
+        console.log('Sample payments (first 20):', JSON.stringify(allPaymentsDebug, null, 2));
+        
+        // Also log all $1 payments regardless of email (to see if payments exist)
+        const allOneDollarPayments = allPayments.filter(p => {
+          const amount = p.amount || p.plan?.price || 0;
+          const normalized = typeof amount === 'number' ? amount : parseFloat(String(amount).replace(/[^0-9.]/g, ''));
+          return normalized === 1 || normalized === 1.0;
+        });
+        console.log('All $1 payments found:', allOneDollarPayments.length);
+        console.log('$1 payment details:', JSON.stringify(allOneDollarPayments.slice(0, 10).map(p => ({
+          id: p.id,
+          email: p.user?.email || p.email,
+          amount: p.amount,
+          reason: p.reason,
+          status: p.status,
+          product: p.product?.title
+        })), null, 2));
         console.log('====================================');
         
         // Find all PAYP payments for this user ($1, one-time)
@@ -210,10 +226,19 @@ export default async function handler(req, res) {
           const paymentReason = (payment.reason || '').toLowerCase();
           const normalizedAmount = typeof paymentAmount === 'number' ? paymentAmount : parseFloat(String(paymentAmount).replace(/[^0-9.]/g, ''));
           
+          // Extract username part for flexible matching
+          const authUsername = authenticatedEmail.split('@')[0];
+          const paymentUsername = paymentEmail.split('@')[0];
+          
           // More flexible email matching (handle common typos/variations)
-          const emailMatches = paymentEmail === authenticatedEmail ||
-                             paymentEmail.includes(authenticatedEmail.split('@')[0]) || // Partial match on username
-                             authenticatedEmail.includes(paymentEmail.split('@')[0]);
+          // Exact match
+          const exactMatch = paymentEmail === authenticatedEmail;
+          // Username match (handles kavishmu vs kavishnu)
+          const usernameMatch = authUsername === paymentUsername;
+          // Partial match (one contains the other)
+          const partialMatch = paymentEmail.includes(authUsername) || authenticatedEmail.includes(paymentUsername);
+          
+          const emailMatches = exactMatch || usernameMatch || partialMatch;
           
           const isOneDollar = normalizedAmount === 1 || normalizedAmount === 1.0;
           const isOneTime = paymentReason.includes('one time payment') || 
@@ -224,6 +249,23 @@ export default async function handler(req, res) {
           // Also check if it's a $1 payment to SettleUP product (even without explicit reason)
           const isSettleUpProduct = (payment.product?.title || '').toLowerCase().includes('settleup') ||
                                    (payment.product?.title || '').toLowerCase().includes('settle up');
+          
+          // Log potential matches for debugging
+          if (isOneDollar && (isOneTime || isSettleUpProduct)) {
+            console.log('Potential PAYP payment found:', {
+              paymentEmail,
+              authenticatedEmail,
+              exactMatch,
+              usernameMatch,
+              partialMatch,
+              emailMatches,
+              amount: paymentAmount,
+              normalizedAmount,
+              reason: payment.reason,
+              status: payment.status,
+              product: payment.product?.title
+            });
+          }
           
           if (emailMatches && isOneDollar && (isOneTime || isSettleUpProduct)) {
             matchedPaymentsDebug.push({
