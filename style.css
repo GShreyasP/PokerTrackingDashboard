@@ -147,14 +147,15 @@ body:has(.auth-page:not(.hidden)) .page-header {
         position: relative !important;
     }
     
-    /* Hide title section on mobile except on auth page */
+    /* Show title section on mobile (was hidden before) */
     .header-title-section {
-        display: none;
+        display: flex;
     }
     
-    /* Show title section on auth page for mobile */
-    body:has(.auth-page:not(.hidden)) .header-title-section {
-        display: flex;
+    /* Reduce app name size on mobile to fit everything on one row */
+    .header-title-section h1 {
+        font-size: 16px;
+        letter-spacing: -0.3px;
     }
     
     /* Hide hamburger menu button on auth page for mobile */
@@ -4090,6 +4091,12 @@ h3 {
 @media (max-width: 768px) {
     .header-title-section {
         gap: 3px;
+    }
+    
+    /* Reduce app name size on mobile to fit everything on one row */
+    .header-title-section h1 {
+        font-size: 16px;
+        letter-spacing: -0.3px;
     }
     
     .plan-badge {
