@@ -64,6 +64,13 @@
                     </svg>
                     <span>Settings</span>
                 </a>
+                <a href="#" class="sidebar-menu-item" onclick="toggleSidebarMenu(); showUpgradePage(); return false;">
+                    <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                    <span>Upgrade</span>
+                </a>
                 <div class="sidebar-divider"></div>
                 <a href="#" class="sidebar-menu-item" onclick="toggleSidebarMenu(); signOut(); return false;">
                     <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -368,6 +375,79 @@
                     </div>
                 </div>
                 <div class="analytics-footer">
+                    <button class="btn btn-secondary" onclick="showMainScreen()">Back to Home</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Upgrade Page -->
+        <div id="upgrade-page" class="upgrade-page hidden">
+            <div class="upgrade-content">
+                <div class="upgrade-header">
+                    <h2>Upgrade Your Plan</h2>
+                    <p class="upgrade-subtitle">Choose the plan that works best for you</p>
+                </div>
+                <div class="pricing-cards">
+                    <!-- Pay as you Play Plan -->
+                    <div class="pricing-card">
+                        <div class="pricing-card-header">
+                            <h3>Pay as you Play</h3>
+                            <div class="pricing-price">
+                                <span class="price-amount">$0.99</span>
+                                <span class="price-period">per tracker</span>
+                            </div>
+                        </div>
+                        <div class="pricing-features">
+                            <ul>
+                                <li>Pay only for what you use</li>
+                                <li>No monthly commitment</li>
+                                <li>Perfect for occasional players</li>
+                            </ul>
+                        </div>
+                        <button class="btn btn-primary pricing-btn" onclick="handlePayAsYouPlay()">Get Started</button>
+                    </div>
+                    
+                    <!-- Monthly Subscription -->
+                    <div class="pricing-card featured">
+                        <div class="pricing-badge">Popular</div>
+                        <div class="pricing-card-header">
+                            <h3>Monthly Subscription</h3>
+                            <div class="pricing-price">
+                                <span class="price-amount">$7.99</span>
+                                <span class="price-period">/month</span>
+                            </div>
+                        </div>
+                        <div class="pricing-features">
+                            <ul>
+                                <li>Unlimited trackers</li>
+                                <li>Cancel anytime</li>
+                                <li>Best for regular players</li>
+                            </ul>
+                        </div>
+                        <button class="btn btn-primary pricing-btn" onclick="handleMonthlySubscription()">Join Now</button>
+                    </div>
+                    
+                    <!-- 6 Month Subscription -->
+                    <div class="pricing-card">
+                        <div class="pricing-card-header">
+                            <h3>6 Month Subscription</h3>
+                            <div class="pricing-price">
+                                <span class="price-amount">$34.99</span>
+                                <span class="price-period">/6 months</span>
+                            </div>
+                            <div class="pricing-savings">Save $12.95</div>
+                        </div>
+                        <div class="pricing-features">
+                            <ul>
+                                <li>Unlimited trackers</li>
+                                <li>Best value</li>
+                                <li>Save 31% vs monthly</li>
+                            </ul>
+                        </div>
+                        <button class="btn btn-primary pricing-btn" onclick="handleSixMonthSubscription()">Join Now</button>
+                    </div>
+                </div>
+                <div class="upgrade-footer">
                     <button class="btn btn-secondary" onclick="showMainScreen()">Back to Home</button>
                 </div>
             </div>

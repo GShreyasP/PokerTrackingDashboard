@@ -628,13 +628,14 @@ async function showMainScreen() {
     const authPage = document.getElementById('auth-page');
     const analyticsPage = document.getElementById('analytics-page');
     const settingsPage = document.getElementById('settings-page');
+    const upgradePage = document.getElementById('upgrade-page');
     // IMPORTANT: Always hide setup section first when showing main screen
     if (setupSection) {
         setupSection.classList.add('hidden');
         setupSection.style.display = 'none'; // Force hide with inline style
     }
     
-    // Hide auth page, analytics page, and settings page if visible
+    // Hide auth page, analytics page, settings page, and upgrade page if visible
     if (authPage) authPage.classList.add('hidden');
     if (analyticsPage) {
         analyticsPage.classList.add('hidden');
@@ -643,6 +644,10 @@ async function showMainScreen() {
     if (settingsPage) {
         settingsPage.classList.add('hidden');
         settingsPage.style.display = 'none';
+    }
+    if (upgradePage) {
+        upgradePage.classList.add('hidden');
+        upgradePage.style.display = 'none';
     }
     
     // Hide tracking section first (with inline style for robustness)
@@ -6077,6 +6082,65 @@ async function deleteAnalyticsEntry(gameIdentifier) {
 }
 
 window.showAnalyticsPage = showAnalyticsPage;
+
+// ==================== UPGRADE PAGE ====================
+
+async function showUpgradePage() {
+    const mainScreen = document.getElementById('main-screen');
+    const upgradePage = document.getElementById('upgrade-page');
+    const setupSection = document.getElementById('setup-section');
+    const trackingSection = document.getElementById('tracking-section');
+    const settingsPage = document.getElementById('settings-page');
+    const analyticsPage = document.getElementById('analytics-page');
+    
+    // Hide all other pages with inline styles for robustness
+    if (mainScreen) {
+        mainScreen.classList.add('hidden');
+        mainScreen.style.display = 'none';
+    }
+    if (setupSection) {
+        setupSection.classList.add('hidden');
+        setupSection.style.display = 'none';
+    }
+    if (trackingSection) {
+        trackingSection.classList.add('hidden');
+        trackingSection.style.display = 'none';
+    }
+    if (settingsPage) {
+        settingsPage.classList.add('hidden');
+        settingsPage.style.display = 'none';
+    }
+    if (analyticsPage) {
+        analyticsPage.classList.add('hidden');
+        analyticsPage.style.display = 'none';
+    }
+    
+    // Show upgrade page with inline style to ensure visibility
+    if (upgradePage) {
+        upgradePage.classList.remove('hidden');
+        upgradePage.style.display = '';
+    }
+}
+
+function handlePayAsYouPlay() {
+    // TODO: Implement pay-as-you-play payment flow
+    showAlertModal('Pay-as-you-play payment integration coming soon!');
+}
+
+function handleMonthlySubscription() {
+    // Redirect to Whop subscription page
+    window.open('https://whop.com/settleup/settleup-19', '_blank');
+}
+
+function handleSixMonthSubscription() {
+    // Redirect to Whop subscription page
+    window.open('https://whop.com/settleup/settleup-19', '_blank');
+}
+
+window.showUpgradePage = showUpgradePage;
+window.handlePayAsYouPlay = handlePayAsYouPlay;
+window.handleMonthlySubscription = handleMonthlySubscription;
+window.handleSixMonthSubscription = handleSixMonthSubscription;
 window.deleteAnalyticsEntry = deleteAnalyticsEntry;
 window.clearTable = clearTable;
 window.selectPersonFromSearch = selectPersonFromSearch;
