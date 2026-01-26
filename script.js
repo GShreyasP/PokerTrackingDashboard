@@ -6485,18 +6485,18 @@ async function showUpgradePage() {
 }
 
 function handlePayAsYouPlay() {
-    // TODO: Implement pay-as-you-play payment flow
-    showAlertModal('Pay-as-you-play payment integration coming soon!');
+    // Redirect to Whop PAYP checkout
+    window.open('https://whop.com/checkout/plan_AYljP0LPlsikE', '_blank');
 }
 
 function handleMonthlySubscription() {
-    // Redirect to Whop subscription page
-    window.open('https://whop.com/settleup/settleup-19', '_blank');
+    // Redirect to Whop monthly subscription checkout
+    window.open('https://whop.com/checkout/plan_N6mSBFXV8ozrH', '_blank');
 }
 
 function handleSixMonthSubscription() {
-    // Redirect to Whop subscription page
-    window.open('https://whop.com/settleup/settleup-19', '_blank');
+    // Redirect to Whop 6-month subscription checkout
+    window.open('https://whop.com/checkout/plan_8MBIgfX4XvYFw', '_blank');
 }
 
 window.showUpgradePage = showUpgradePage;
