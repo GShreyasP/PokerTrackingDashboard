@@ -738,11 +738,25 @@ async function checkWhopSubscriptionStatus(userEmail) {
         });
         
         if (!response.ok) {
-            console.error('Failed to check subscription status:', response.status);
+            const errorText = await response.text();
+            console.error('Failed to check subscription status:', response.status, errorText);
             return null;
         }
         
         const data = await response.json();
+        
+        // Log API response for debugging
+        console.log('=== WHOP API RESPONSE ===');
+        console.log('Full Response:', JSON.stringify(data, null, 2));
+        console.log('Has Subscription:', data.hasSubscription);
+        console.log('Subscription Type:', data.subscriptionType);
+        console.log('Is One Time Payment:', data.isOneTimePayment);
+        console.log('PAYP Payment Count:', data.paypPaymentCount);
+        if (data.debug) {
+            console.log('Debug Info:', JSON.stringify(data.debug, null, 2));
+        }
+        console.log('========================');
+        
         return data;
     } catch (error) {
         console.error('Error checking subscription status:', error);
@@ -1056,15 +1070,35 @@ async function refreshSubscriptionStatus() {
         // Always sync credits for PAYP users based on payment count (handles multiple payments)
         if (subscriptionData.subscriptionType === 'payp' || subscriptionData.isOneTimePayment) {
             const paypPaymentCount = subscriptionData.paypPaymentCount || 0;
+            const debugInfo = subscriptionData.debug || null;
+            
+            console.log('=== REFRESH SUBSCRIPTION - PAYP DETECTED ===');
+            console.log('Subscription Data:', JSON.stringify(subscriptionData, null, 2));
+            console.log('PAYP Payment Count:', paypPaymentCount);
+            console.log('Debug Info:', JSON.stringify(debugInfo, null, 2));
+            console.log('============================================');
+            
             if (paypPaymentCount > 0) {
-                await syncPaypCredits(userId, paypPaymentCount);
+                await syncPaypCredits(userId, paypPaymentCount, debugInfo);
             } else {
+                console.log('⚠️ PAYP detected but payment count is 0. Using fallback method.');
                 // Fallback: if payment count not available, check if user just got PAYP
                 const oldStatus = await getSubscriptionStatus(userId, userEmail);
                 const wasPayp = oldStatus?.subscriptionType === 'payp' || oldStatus?.isOneTimePayment;
                 if (!wasPayp) {
                     // User just got PAYP, add 1 credit
+                    console.log('User just got PAYP (was not PAYP before), adding 1 credit');
                     await addPaypCredit(userId);
+                } else {
+                    console.log('User already had PAYP, but payment count is 0. This might indicate an API issue.');
+                    if (debugInfo) {
+                        console.log('Debug info shows:', {
+                            totalPayments: debugInfo.totalPaymentsFound,
+                            matchedPayments: debugInfo.matchedPayments?.length || 0,
+                            membershipEmail: debugInfo.membershipEmail,
+                            paymentEmail: debugInfo.paymentEmail
+                        });
+                    }
                 }
             }
         }
