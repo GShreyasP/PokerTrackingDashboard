@@ -3746,6 +3746,22 @@ h3 {
     line-height: 1.5;
 }
 
+.credits-value {
+    color: #10b981;
+    font-weight: 700;
+    font-size: 1.1em;
+}
+
+.credits-info {
+    margin-top: 8px;
+}
+
+.credits-note {
+    color: #64748b;
+    font-size: 0.85em;
+    font-style: italic;
+}
+
 .settings-input {
     width: 100%;
     padding: 14px 16px;
