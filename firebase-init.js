@@ -66,6 +66,18 @@ async function initFirebase() {
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
                 
+                // Check subscription status on login (non-blocking)
+                if (window.refreshSubscriptionStatus && user.email) {
+                    // Run in background, don't wait for it
+                    setTimeout(async () => {
+                        try {
+                            await window.refreshSubscriptionStatus();
+                        } catch (error) {
+                            console.error('Error refreshing subscription status on login:', error);
+                        }
+                    }, 1000);
+                }
+                
                 // Show friends button and hamburger menu only after authenticated view is shown and auth page is hidden
                 // Use setTimeout to ensure auth page is hidden first
                 setTimeout(() => {

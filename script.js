@@ -678,32 +678,179 @@ async function showMainScreen() {
     saveViewingState();
 }
 
-// Show setup section
-async function showSetupSection() {
-    // Check if user already has 2 trackers
-    if (window.firebaseDb && window.currentUser) {
-        try {
-            const userId = window.currentUser.uid;
-            const docRef = window.firebaseDb.collection('users').doc(userId);
-            const doc = await docRef.get();
-            
-            if (doc.exists) {
-                const userData = doc.data();
-                const trackers = userData.trackers || [];
-                
-                if (trackers.length >= 2) {
-                    // Show error message
-                    const errorDiv = document.getElementById('tracker-limit-error');
-                    if (errorDiv) {
-                        errorDiv.textContent = 'Upgrade to the next tier to create more tables';
-                        errorDiv.classList.remove('hidden');
-                    }
-                    return;
+// ==================== SUBSCRIPTION MANAGEMENT ====================
+
+// Check user's subscription status from Whop
+async function checkWhopSubscriptionStatus(userEmail) {
+    if (!userEmail) {
+        console.error('No email provided for subscription check');
+        return null;
+    }
+    
+    try {
+        const response = await fetch('/api/whop-check-subscription', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email: userEmail })
+        });
+        
+        if (!response.ok) {
+            console.error('Failed to check subscription status:', response.status);
+            return null;
+        }
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error checking subscription status:', error);
+        return null;
+    }
+}
+
+// Get subscription status from Firestore (cached)
+async function getSubscriptionStatus(userId) {
+    if (!window.firebaseDb || !userId) {
+        return null;
+    }
+    
+    try {
+        const userRef = window.firebaseDb.collection('users').doc(userId);
+        const userDoc = await userRef.get();
+        
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            return {
+                hasSubscription: userData.hasSubscription || false,
+                subscriptionType: userData.subscriptionType || null,
+                expiresAt: userData.subscriptionExpiresAt || null,
+                lastChecked: userData.subscriptionLastChecked || null
+            };
+        }
+    } catch (error) {
+        console.error('Error getting subscription status:', error);
+    }
+    
+    return null;
+}
+
+// Update subscription status in Firestore
+async function updateSubscriptionStatus(userId, subscriptionData) {
+    if (!window.firebaseDb || !userId) {
+        return;
+    }
+    
+    try {
+        const userRef = window.firebaseDb.collection('users').doc(userId);
+        await userRef.set({
+            hasSubscription: subscriptionData.hasSubscription || false,
+            subscriptionType: subscriptionData.subscriptionType || null,
+            subscriptionExpiresAt: subscriptionData.expiresAt || null,
+            subscriptionLastChecked: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+    } catch (error) {
+        console.error('Error updating subscription status:', error);
+    }
+}
+
+// Refresh subscription status from Whop and update Firestore
+async function refreshSubscriptionStatus() {
+    if (!window.currentUser || !window.currentUser.email) {
+        return null;
+    }
+    
+    const userId = window.currentUser.uid;
+    const userEmail = window.currentUser.email;
+    
+    // Check subscription status from Whop
+    const subscriptionData = await checkWhopSubscriptionStatus(userEmail);
+    
+    if (subscriptionData) {
+        // Update Firestore with latest status
+        await updateSubscriptionStatus(userId, subscriptionData);
+        return subscriptionData;
+    }
+    
+    return null;
+}
+
+// Check if user can create more trackers
+async function canCreateTracker() {
+    if (!window.firebaseDb || !window.currentUser) {
+        return { canCreate: false, reason: 'Not authenticated' };
+    }
+    
+    try {
+        const userId = window.currentUser.uid;
+        const userRef = window.firebaseDb.collection('users').doc(userId);
+        const userDoc = await userRef.get();
+        
+        if (!userDoc.exists) {
+            return { canCreate: true }; // New user, can create first tracker
+        }
+        
+        const userData = userDoc.data();
+        const trackers = userData.trackers || [];
+        
+        // Check subscription status
+        let subscriptionStatus = await getSubscriptionStatus(userId);
+        
+        // If subscription status is old (more than 1 hour), refresh it
+        const lastChecked = subscriptionStatus?.lastChecked;
+        const shouldRefresh = !lastChecked || 
+            (lastChecked.toDate && new Date() - lastChecked.toDate() > 3600000); // 1 hour
+        
+        if (shouldRefresh) {
+            subscriptionStatus = await refreshSubscriptionStatus();
+        }
+        
+        // If user has active subscription, allow unlimited trackers
+        if (subscriptionStatus?.hasSubscription) {
+            // Check if subscription is expired
+            if (subscriptionStatus.expiresAt) {
+                const expiresAt = new Date(subscriptionStatus.expiresAt);
+                if (expiresAt < new Date()) {
+                    // Subscription expired, treat as free user
+                    return { 
+                        canCreate: trackers.length < 2, 
+                        reason: trackers.length >= 2 ? 'Free tier limit reached. Upgrade to create more tables.' : null
+                    };
                 }
             }
-        } catch (error) {
-            console.error('Error checking tracker limit:', error);
+            // Active subscription - unlimited trackers
+            return { canCreate: true, subscriptionType: subscriptionStatus.subscriptionType };
         }
+        
+        // Free tier: limit to 2 trackers
+        if (trackers.length >= 2) {
+            return { 
+                canCreate: false, 
+                reason: 'Free tier limit reached. Upgrade to create more tables.' 
+            };
+        }
+        
+        return { canCreate: true };
+    } catch (error) {
+        console.error('Error checking if user can create tracker:', error);
+        // On error, allow creation (fail open)
+        return { canCreate: true };
+    }
+}
+
+// Show setup section
+async function showSetupSection() {
+    // Check if user can create more trackers
+    const canCreate = await canCreateTracker();
+    
+    if (!canCreate.canCreate) {
+        // Show error message
+        const errorDiv = document.getElementById('tracker-limit-error');
+        if (errorDiv) {
+            errorDiv.textContent = canCreate.reason || 'Upgrade to the next tier to create more tables';
+            errorDiv.classList.remove('hidden');
+        }
+        return;
     }
     
     // Hide error message if visible
@@ -6156,6 +6303,9 @@ window.showUpgradePage = showUpgradePage;
 window.handlePayAsYouPlay = handlePayAsYouPlay;
 window.handleMonthlySubscription = handleMonthlySubscription;
 window.handleSixMonthSubscription = handleSixMonthSubscription;
+window.checkWhopSubscriptionStatus = checkWhopSubscriptionStatus;
+window.refreshSubscriptionStatus = refreshSubscriptionStatus;
+window.canCreateTracker = canCreateTracker;
 window.deleteAnalyticsEntry = deleteAnalyticsEntry;
 window.clearTable = clearTable;
 window.selectPersonFromSearch = selectPersonFromSearch;
