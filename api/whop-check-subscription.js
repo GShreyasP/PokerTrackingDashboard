@@ -147,9 +147,11 @@ export default async function handler(req, res) {
     let allPayments = [];
     let paypPaymentCount = 0;
     let matchedPaymentsDebug = [];
+    let allPaymentsDebug = [];
     
     try {
-      const paymentsResponse = await fetch(`https://api.whop.com/api/v2/payments`, {
+      // Try to fetch payments with pagination - get all pages
+      let paymentsResponse = await fetch(`https://api.whop.com/api/v2/payments?per_page=100`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${whopApiKey}`,
@@ -161,29 +163,79 @@ export default async function handler(req, res) {
         const paymentsData = await paymentsResponse.json();
         allPayments = paymentsData.data || [];
         
+        // Handle pagination if there are more pages
+        let currentPage = paymentsData.meta?.current_page || 1;
+        const totalPages = paymentsData.meta?.total_pages || 1;
+        
+        while (currentPage < totalPages) {
+          currentPage++;
+          const nextPageResponse = await fetch(`https://api.whop.com/api/v2/payments?per_page=100&page=${currentPage}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${whopApiKey}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (nextPageResponse.ok) {
+            const nextPageData = await nextPageResponse.json();
+            allPayments = [...allPayments, ...(nextPageData.data || [])];
+          }
+        }
+        
+        // Log all payments for debugging (first 20)
+        allPaymentsDebug = allPayments.slice(0, 20).map(p => ({
+          id: p.id,
+          email: p.user?.email || p.email || 'no email',
+          userId: p.user?.id || 'no user id',
+          amount: p.amount || p.plan?.price || 'no amount',
+          reason: p.reason || 'no reason',
+          status: p.status || 'no status',
+          created_at: p.created_at || 'no date',
+          product: p.product?.title || 'no product',
+          plan: p.plan?.name || 'no plan'
+        }));
+        
+        console.log('=== ALL PAYMENTS DEBUG (first 20) ===');
+        console.log('Total payments found:', allPayments.length);
+        console.log('Authenticated email:', authenticatedEmail);
+        console.log('Sample payments:', JSON.stringify(allPaymentsDebug, null, 2));
+        console.log('====================================');
+        
         // Find all PAYP payments for this user ($1, one-time)
+        // Try multiple email matching strategies (handle typos, case differences, etc.)
         const userPaypPayments = allPayments.filter(payment => {
-          const paymentEmail = payment.user?.email || payment.email || '';
+          const paymentEmail = (payment.user?.email || payment.email || '').toLowerCase().trim();
           const paymentAmount = payment.amount || payment.plan?.price || 0;
           const paymentReason = (payment.reason || '').toLowerCase();
           const normalizedAmount = typeof paymentAmount === 'number' ? paymentAmount : parseFloat(String(paymentAmount).replace(/[^0-9.]/g, ''));
           
-          const emailMatches = paymentEmail.toLowerCase() === authenticatedEmail;
+          // More flexible email matching (handle common typos/variations)
+          const emailMatches = paymentEmail === authenticatedEmail ||
+                             paymentEmail.includes(authenticatedEmail.split('@')[0]) || // Partial match on username
+                             authenticatedEmail.includes(paymentEmail.split('@')[0]);
+          
           const isOneDollar = normalizedAmount === 1 || normalizedAmount === 1.0;
           const isOneTime = paymentReason.includes('one time payment') || 
                            paymentReason.includes('one-time payment') || 
                            paymentReason.includes('onetime payment') ||
                            payment.status === 'succeeded';
           
-          if (emailMatches && isOneDollar && isOneTime) {
+          // Also check if it's a $1 payment to SettleUP product (even without explicit reason)
+          const isSettleUpProduct = (payment.product?.title || '').toLowerCase().includes('settleup') ||
+                                   (payment.product?.title || '').toLowerCase().includes('settle up');
+          
+          if (emailMatches && isOneDollar && (isOneTime || isSettleUpProduct)) {
             matchedPaymentsDebug.push({
               id: payment.id,
-              email: paymentEmail,
+              email: payment.user?.email || payment.email,
               amount: paymentAmount,
               normalizedAmount: normalizedAmount,
               reason: payment.reason,
               status: payment.status,
-              created_at: payment.created_at
+              created_at: payment.created_at,
+              product: payment.product?.title,
+              plan: payment.plan?.name
             });
             return true;
           }
@@ -197,6 +249,13 @@ export default async function handler(req, res) {
         if (userPaypPayments.length > 0) {
           matchingPayment = userPaypPayments[0];
         }
+        
+        console.log('=== PAYP PAYMENT MATCHING RESULTS ===');
+        console.log('Authenticated Email:', authenticatedEmail);
+        console.log('Total Payments in System:', allPayments.length);
+        console.log('Matched PAYP Payments:', paypPaymentCount);
+        console.log('Matched Payment Details:', JSON.stringify(matchedPaymentsDebug, null, 2));
+        console.log('======================================');
         
         // If we found PAYP payments but no membership, user still has PAYP subscription
         // (one-time payments might not create active memberships)
@@ -226,6 +285,7 @@ export default async function handler(req, res) {
               isPaypByPriceAndReason: true,
               totalPaymentsFound: allPayments.length,
               matchedPayments: matchedPaymentsDebug,
+              allPaymentsSample: allPaymentsDebug,
               note: 'Subscription detected from payments only (no membership found)'
             }
           });
