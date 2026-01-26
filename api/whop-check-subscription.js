@@ -57,42 +57,68 @@ export default async function handler(req, res) {
     
     const whopApiKey = process.env.WHOP_API_KEY;
     const whopProductId = process.env.WHOP_PRODUCT_ID;
+    const whopPaypProductId = process.env.WHOP_PAYP_PRODUCT_ID; // Optional: separate product ID for PAYP
     
-    if (!whopApiKey || !whopProductId) {
-      console.error('Whop API configuration missing');
+    if (!whopApiKey) {
+      console.error('Whop API key missing');
       return res.status(500).json({ error: 'Whop API not configured' });
     }
     
-    // Use Whop API to check membership by email
-    // Whop API endpoint: GET /api/v2/memberships?email={email}
-    // Alternative: We'll search members and check their access to the product
+    // Check memberships for the user by email across all products
+    // First try to get memberships by email (if API supports it)
+    // Otherwise, check both subscription product and PAYP product
     
-    // First, get memberships for the product
-    const membershipsResponse = await fetch(`https://api.whop.com/api/v2/memberships?product_id=${whopProductId}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${whopApiKey}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    let matchingMembership = null;
+    let isPaypPurchase = false;
     
-    if (!membershipsResponse.ok) {
-      const errorText = await membershipsResponse.text();
-      console.error('Whop API error fetching memberships:', membershipsResponse.status, errorText);
-      // Return no subscription on error (fail gracefully)
-      return res.status(200).json({ 
-        hasSubscription: false,
-        subscriptionType: null,
-        expiresAt: null
+    // Check subscription product first
+    if (whopProductId) {
+      const membershipsResponse = await fetch(`https://api.whop.com/api/v2/memberships?product_id=${whopProductId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${whopApiKey}`,
+          'Content-Type': 'application/json'
+        }
       });
+      
+      if (membershipsResponse.ok) {
+        const membershipsData = await membershipsResponse.json();
+        matchingMembership = membershipsData.data?.find(membership => {
+          return membership.email?.toLowerCase() === authenticatedEmail;
+        });
+      }
     }
     
-    const membershipsData = await membershipsResponse.json();
+    // If not found in subscription product, check PAYP product (if separate)
+    if (!matchingMembership && whopPaypProductId) {
+      const paypMembershipsResponse = await fetch(`https://api.whop.com/api/v2/memberships?product_id=${whopPaypProductId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${whopApiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (paypMembershipsResponse.ok) {
+        const paypMembershipsData = await paypMembershipsResponse.json();
+        const paypMembership = paypMembershipsData.data?.find(membership => {
+          return membership.email?.toLowerCase() === authenticatedEmail;
+        });
+        
+        if (paypMembership) {
+          matchingMembership = paypMembership;
+          isPaypPurchase = true;
+        }
+      }
+    }
     
-    // Find membership with matching email (use authenticated email for security)
-    const matchingMembership = membershipsData.data?.find(membership => {
-      return membership.email?.toLowerCase() === authenticatedEmail;
-    });
+    // If still not found, try checking by plan ID (PAYP plan: plan_AYljP0LPlsikE)
+    // We can also check all memberships and filter by email
+    if (!matchingMembership) {
+      // Try to get all memberships and search by email
+      // Note: This might require checking multiple products or using a different endpoint
+      // For now, we'll rely on the product-specific checks above
+    }
     
     if (!matchingMembership) {
       return res.status(200).json({ 
@@ -117,15 +143,16 @@ export default async function handler(req, res) {
     
     // Determine subscription type based on plan/product
     let subscriptionType = 'monthly'; // default
-    let isOneTimePayment = false;
+    let isOneTimePayment = isPaypPurchase; // If found in PAYP product, it's one-time
     
     if (matchingMembership.plan) {
       const planId = matchingMembership.plan.id || '';
       const planName = (matchingMembership.plan.name || '').toLowerCase();
+      const planType = matchingMembership.plan.plan_type || '';
       
       // Check if this is the PAYP one-time payment plan
       // PAYP plan ID: plan_AYljP0LPlsikE
-      if (planId === 'plan_AYljP0LPlsikE' || planName.includes('pay as you play') || planName.includes('one-time')) {
+      if (planId === 'plan_AYljP0LPlsikE' || planName.includes('pay as you play') || planName.includes('one-time') || planType === 'one_time') {
         subscriptionType = 'payp';
         isOneTimePayment = true;
       } else if (planId === 'plan_8MBIgfX4XvYFw' || planName.includes('6 month') || planName.includes('6-month') || planName.includes('6mo')) {
@@ -134,12 +161,11 @@ export default async function handler(req, res) {
         subscriptionType = 'monthly';
       }
       
-      // Also check if it's a one-time payment by looking at billing type
+      // Also check if it's a one-time payment by looking at billing/recurring fields
       // One-time payments typically don't have recurring billing
-      if (!matchingMembership.recurring || matchingMembership.billing_type === 'one_time') {
-        isOneTimePayment = true;
-        if (subscriptionType === 'monthly' || subscriptionType === '6month') {
-          // If it was marked as subscription but is actually one-time, it's PAYP
+      if (!matchingMembership.recurring || matchingMembership.billing_type === 'one_time' || planType === 'one_time') {
+        if (!isOneTimePayment) {
+          isOneTimePayment = true;
           subscriptionType = 'payp';
         }
       }
