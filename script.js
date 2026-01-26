@@ -818,9 +818,10 @@ async function updateSubscriptionStatus(userId, subscriptionData) {
         // Initialize credits for all users
         await initializeCredits(userId);
         
-        // Add +1 credit if user just got PAYP subscription
-        if (isNowPayp && !wasPayp) {
-            await addPaypCredit(userId);
+        // Sync credits based on PAYP payment count if user has PAYP
+        if (isNowPayp) {
+            // We need to get the payment count from subscription data
+            // This will be handled in refreshSubscriptionStatus which calls syncPaypCredits
         }
         
         // Update plan display after updating status
@@ -830,7 +831,52 @@ async function updateSubscriptionStatus(userId, subscriptionData) {
     }
 }
 
-// Add +1 credit when PAYP plan is purchased
+// Sync credits based on PAYP payment count
+async function syncPaypCredits(userId, paypPaymentCount) {
+    if (!window.firebaseDb || !userId || !paypPaymentCount) {
+        return;
+    }
+    
+    try {
+        const userRef = window.firebaseDb.collection('users').doc(userId);
+        await initializeCredits(userId); // Ensure credits exist first
+        
+        const userDoc = await userRef.get();
+        
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            const currentCredits = userData.credits !== undefined ? userData.credits : 3;
+            const creditsFromPayp = userData.creditsFromPayp || 0; // Track how many credits came from PAYP
+            
+            // Calculate how many credits should come from PAYP (each payment = +1 credit)
+            // Start with 3 base credits, then add 1 per PAYP payment
+            const expectedCreditsFromPayp = paypPaymentCount;
+            const creditsToAdd = expectedCreditsFromPayp - creditsFromPayp;
+            
+            if (creditsToAdd > 0) {
+                const newCredits = currentCredits + creditsToAdd;
+                const newCreditsFromPayp = expectedCreditsFromPayp;
+                
+                await userRef.set({
+                    credits: newCredits,
+                    creditsFromPayp: newCreditsFromPayp
+                }, { merge: true });
+                
+                console.log(`PAYP credits synced. Added ${creditsToAdd} credit(s). Total credits: ${newCredits} (${newCreditsFromPayp} from PAYP)`);
+                
+                // Update credits display in settings if visible
+                const creditsDisplay = document.getElementById('settings-credits-display');
+                if (creditsDisplay && !creditsDisplay.textContent.includes('Unlimited')) {
+                    creditsDisplay.textContent = newCredits;
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error syncing PAYP credits:', error);
+    }
+}
+
+// Add +1 credit when PAYP plan is purchased (legacy function, kept for backward compatibility)
 async function addPaypCredit(userId) {
     if (!window.firebaseDb || !userId) {
         return;
@@ -845,17 +891,20 @@ async function addPaypCredit(userId) {
         if (userDoc.exists) {
             const userData = userDoc.data();
             const currentCredits = userData.credits !== undefined ? userData.credits : 3;
+            const creditsFromPayp = userData.creditsFromPayp || 0;
             const newCredits = currentCredits + 1;
+            const newCreditsFromPayp = creditsFromPayp + 1;
             
             await userRef.set({
-                credits: newCredits
+                credits: newCredits,
+                creditsFromPayp: newCreditsFromPayp
             }, { merge: true });
             
             console.log(`PAYP plan purchased. Credits increased from ${currentCredits} to ${newCredits}`);
             
             // Update credits display in settings if visible
             const creditsDisplay = document.getElementById('settings-credits-display');
-            if (creditsDisplay) {
+            if (creditsDisplay && !creditsDisplay.textContent.includes('Unlimited')) {
                 creditsDisplay.textContent = newCredits;
             }
         }
@@ -907,9 +956,15 @@ async function refreshSubscriptionStatus() {
         // Initialize credits for all users
         await initializeCredits(userId);
         
-        // Add +1 credit if user just purchased PAYP plan
+        // Sync credits based on PAYP payment count (handles multiple payments)
         if (subscriptionData.subscriptionType === 'payp' || subscriptionData.isOneTimePayment) {
-            await addPaypCredit(userId);
+            const paypPaymentCount = subscriptionData.paypPaymentCount || 0;
+            if (paypPaymentCount > 0) {
+                await syncPaypCredits(userId, paypPaymentCount);
+            } else {
+                // Fallback: if payment count not available, use old method
+                await addPaypCredit(userId);
+            }
         }
         
         // If subscription just expired, mark all trackers for expiration

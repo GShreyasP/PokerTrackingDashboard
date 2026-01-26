@@ -296,12 +296,47 @@ export default async function handler(req, res) {
       paymentData: matchingPayment ? JSON.stringify(matchingPayment, null, 2).substring(0, 500) : 'No payment found'
     });
     
+    // Count PAYP payments for this user
+    let paypPaymentCount = 0;
+    if (matchingPayment || isOneTimePayment || subscriptionType === 'payp') {
+      // Count all PAYP payments (one-time $1 payments)
+      try {
+        const paymentsResponse = await fetch(`https://api.whop.com/api/v2/payments`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${whopApiKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (paymentsResponse.ok) {
+          const paymentsData = await paymentsResponse.json();
+          // Filter payments for this user that are PAYP ($1, one-time)
+          const userPayments = paymentsData.data?.filter(payment => {
+            const paymentEmail = payment.user?.email || payment.email || '';
+            const paymentAmount = payment.amount || payment.plan?.price || 0;
+            const paymentReason = (payment.reason || '').toLowerCase();
+            const normalizedAmount = typeof paymentAmount === 'number' ? paymentAmount : parseFloat(String(paymentAmount).replace(/[^0-9.]/g, ''));
+            
+            return paymentEmail.toLowerCase() === authenticatedEmail &&
+                   (normalizedAmount === 1 || normalizedAmount === 1.0) &&
+                   (paymentReason.includes('one time payment') || paymentReason.includes('one-time payment') || paymentReason.includes('onetime payment') || payment.status === 'succeeded');
+          });
+          
+          paypPaymentCount = userPayments?.length || 0;
+        }
+      } catch (error) {
+        console.error('Error counting PAYP payments:', error);
+      }
+    }
+    
     return res.status(200).json({
       hasSubscription: true,
       subscriptionType: subscriptionType,
       expiresAt: expiresAt,
       memberId: matchingMembership.id,
-      isOneTimePayment: isOneTimePayment
+      isOneTimePayment: isOneTimePayment,
+      paypPaymentCount: paypPaymentCount // Number of PAYP payments made
     });
     
   } catch (error) {
