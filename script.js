@@ -680,6 +680,23 @@ async function showMainScreen() {
 
 // ==================== SUBSCRIPTION MANAGEMENT ====================
 
+// Whitelist of emails that have permanent Pro plan access
+// Add or remove emails from this array to grant/revoke permanent Pro access
+const PRO_PLAN_WHITELIST = [
+    // Add whitelisted emails here (lowercase for case-insensitive matching)
+    // Example: 'admin@example.com',
+    // Example: 'beta@example.com',
+];
+
+// Check if an email is whitelisted for Pro plan
+function isEmailWhitelisted(email) {
+    if (!email) {
+        return false;
+    }
+    const emailLower = email.toLowerCase().trim();
+    return PRO_PLAN_WHITELIST.includes(emailLower);
+}
+
 // Check user's subscription status from Whop
 async function checkWhopSubscriptionStatus(userEmail) {
     if (!userEmail) {
@@ -710,9 +727,20 @@ async function checkWhopSubscriptionStatus(userEmail) {
 }
 
 // Get subscription status from Firestore (cached)
-async function getSubscriptionStatus(userId) {
+async function getSubscriptionStatus(userId, userEmail = null) {
     if (!window.firebaseDb || !userId) {
         return null;
+    }
+    
+    // Check if user is whitelisted first
+    if (userEmail && isEmailWhitelisted(userEmail)) {
+        return {
+            hasSubscription: true,
+            subscriptionType: 'pro',
+            expiresAt: null, // Never expires for whitelisted users
+            lastChecked: null,
+            isWhitelisted: true
+        };
     }
     
     try {
@@ -725,7 +753,8 @@ async function getSubscriptionStatus(userId) {
                 hasSubscription: userData.hasSubscription || false,
                 subscriptionType: userData.subscriptionType || null,
                 expiresAt: userData.subscriptionExpiresAt || null,
-                lastChecked: userData.subscriptionLastChecked || null
+                lastChecked: userData.subscriptionLastChecked || null,
+                isWhitelisted: false
             };
         }
     } catch (error) {
@@ -766,6 +795,19 @@ async function refreshSubscriptionStatus() {
     const userId = window.currentUser.uid;
     const userEmail = window.currentUser.email;
     
+    // Check if user is whitelisted first
+    if (isEmailWhitelisted(userEmail)) {
+        const whitelistedStatus = {
+            hasSubscription: true,
+            subscriptionType: 'pro',
+            expiresAt: null,
+            isWhitelisted: true
+        };
+        // Update plan display
+        updatePlanDisplay(whitelistedStatus);
+        return whitelistedStatus;
+    }
+    
     // Check subscription status from Whop
     const subscriptionData = await checkWhopSubscriptionStatus(userEmail);
     
@@ -784,7 +826,16 @@ async function refreshSubscriptionStatus() {
 
 // Get plan name from subscription status
 function getPlanName(subscriptionStatus) {
-    if (!subscriptionStatus || !subscriptionStatus.hasSubscription) {
+    if (!subscriptionStatus) {
+        return 'Free Tier';
+    }
+    
+    // Check if user is whitelisted (permanent Pro access)
+    if (subscriptionStatus.isWhitelisted) {
+        return 'Pro Plan';
+    }
+    
+    if (!subscriptionStatus.hasSubscription) {
         return 'Free Tier';
     }
     
@@ -798,7 +849,7 @@ function getPlanName(subscriptionStatus) {
     
     // Determine plan type
     const subscriptionType = subscriptionStatus.subscriptionType;
-    if (subscriptionType === '6month' || subscriptionType === 'monthly') {
+    if (subscriptionType === '6month' || subscriptionType === 'monthly' || subscriptionType === 'pro') {
         return 'Pro Plan';
     }
     
@@ -844,7 +895,8 @@ async function loadPlanDisplay() {
     }
     
     const userId = window.currentUser.uid;
-    const subscriptionStatus = await getSubscriptionStatus(userId);
+    const userEmail = window.currentUser.email;
+    const subscriptionStatus = await getSubscriptionStatus(userId, userEmail);
     
     if (subscriptionStatus) {
         updatePlanDisplay(subscriptionStatus);
@@ -862,6 +914,13 @@ async function canCreateTracker() {
     
     try {
         const userId = window.currentUser.uid;
+        const userEmail = window.currentUser.email;
+        
+        // Check if user is whitelisted first
+        if (isEmailWhitelisted(userEmail)) {
+            return { canCreate: true, subscriptionType: 'pro', isWhitelisted: true };
+        }
+        
         const userRef = window.firebaseDb.collection('users').doc(userId);
         const userDoc = await userRef.get();
         
@@ -872,22 +931,22 @@ async function canCreateTracker() {
         const userData = userDoc.data();
         const trackers = userData.trackers || [];
         
-        // Check subscription status
-        let subscriptionStatus = await getSubscriptionStatus(userId);
+        // Check subscription status (pass email for whitelist check)
+        let subscriptionStatus = await getSubscriptionStatus(userId, userEmail);
         
         // If subscription status is old (more than 1 hour), refresh it
         const lastChecked = subscriptionStatus?.lastChecked;
-        const shouldRefresh = !lastChecked || 
-            (lastChecked.toDate && new Date() - lastChecked.toDate() > 3600000); // 1 hour
+        const shouldRefresh = !subscriptionStatus?.isWhitelisted && (!lastChecked || 
+            (lastChecked.toDate && new Date() - lastChecked.toDate() > 3600000)); // 1 hour
         
         if (shouldRefresh) {
             subscriptionStatus = await refreshSubscriptionStatus();
         }
         
-        // If user has active subscription, allow unlimited trackers
-        if (subscriptionStatus?.hasSubscription) {
-            // Check if subscription is expired
-            if (subscriptionStatus.expiresAt) {
+        // If user has active subscription or is whitelisted, allow unlimited trackers
+        if (subscriptionStatus?.hasSubscription || subscriptionStatus?.isWhitelisted) {
+            // Check if subscription is expired (whitelisted users never expire)
+            if (!subscriptionStatus.isWhitelisted && subscriptionStatus.expiresAt) {
                 const expiresAt = new Date(subscriptionStatus.expiresAt);
                 if (expiresAt < new Date()) {
                     // Subscription expired, treat as free user
@@ -897,8 +956,8 @@ async function canCreateTracker() {
                     };
                 }
             }
-            // Active subscription - unlimited trackers
-            return { canCreate: true, subscriptionType: subscriptionStatus.subscriptionType };
+            // Active subscription or whitelisted - unlimited trackers
+            return { canCreate: true, subscriptionType: subscriptionStatus.subscriptionType || 'pro' };
         }
         
         // Free tier: limit to 2 trackers
