@@ -135,14 +135,14 @@ body:has(.auth-page:not(.hidden)) .page-header {
         position: relative !important;
     }
     
-    /* Hide title on mobile except on auth page */
-    .page-header h1 {
+    /* Hide title section on mobile except on auth page */
+    .header-title-section {
         display: none;
     }
     
-    /* Show title on auth page for mobile */
-    body:has(.auth-page:not(.hidden)) .page-header h1 {
-        display: block;
+    /* Show title section on auth page for mobile */
+    body:has(.auth-page:not(.hidden)) .header-title-section {
+        display: flex;
     }
     
     /* Hide hamburger menu button on auth page for mobile */
