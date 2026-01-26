@@ -117,12 +117,31 @@ export default async function handler(req, res) {
     
     // Determine subscription type based on plan/product
     let subscriptionType = 'monthly'; // default
+    let isOneTimePayment = false;
+    
     if (matchingMembership.plan) {
+      const planId = matchingMembership.plan.id || '';
       const planName = (matchingMembership.plan.name || '').toLowerCase();
-      if (planName.includes('6 month') || planName.includes('6-month') || planName.includes('6mo')) {
+      
+      // Check if this is the PAYP one-time payment plan
+      // PAYP plan ID: plan_AYljP0LPlsikE
+      if (planId === 'plan_AYljP0LPlsikE' || planName.includes('pay as you play') || planName.includes('one-time')) {
+        subscriptionType = 'payp';
+        isOneTimePayment = true;
+      } else if (planId === 'plan_8MBIgfX4XvYFw' || planName.includes('6 month') || planName.includes('6-month') || planName.includes('6mo')) {
         subscriptionType = '6month';
-      } else if (planName.includes('monthly') || planName.includes('month')) {
+      } else if (planId === 'plan_N6mSBFXV8ozrH' || planName.includes('monthly') || planName.includes('month')) {
         subscriptionType = 'monthly';
+      }
+      
+      // Also check if it's a one-time payment by looking at billing type
+      // One-time payments typically don't have recurring billing
+      if (!matchingMembership.recurring || matchingMembership.billing_type === 'one_time') {
+        isOneTimePayment = true;
+        if (subscriptionType === 'monthly' || subscriptionType === '6month') {
+          // If it was marked as subscription but is actually one-time, it's PAYP
+          subscriptionType = 'payp';
+        }
       }
     }
     
@@ -130,7 +149,8 @@ export default async function handler(req, res) {
       hasSubscription: true,
       subscriptionType: subscriptionType,
       expiresAt: expiresAt,
-      memberId: matchingMembership.id
+      memberId: matchingMembership.id,
+      isOneTimePayment: isOneTimePayment
     });
     
   } catch (error) {

@@ -778,7 +778,8 @@ async function getSubscriptionStatus(userId, userEmail = null) {
                 subscriptionType: userData.subscriptionType || null,
                 expiresAt: userData.subscriptionExpiresAt || null,
                 lastChecked: userData.subscriptionLastChecked || null,
-                isWhitelisted: false
+                isWhitelisted: false,
+                isOneTimePayment: userData.isOneTimePayment || false
             };
         }
     } catch (error) {
@@ -800,7 +801,8 @@ async function updateSubscriptionStatus(userId, subscriptionData) {
             hasSubscription: subscriptionData.hasSubscription || false,
             subscriptionType: subscriptionData.subscriptionType || null,
             subscriptionExpiresAt: subscriptionData.expiresAt || null,
-            subscriptionLastChecked: firebase.firestore.FieldValue.serverTimestamp()
+            subscriptionLastChecked: firebase.firestore.FieldValue.serverTimestamp(),
+            isOneTimePayment: subscriptionData.isOneTimePayment || false
         }, { merge: true });
         
         // Update plan display after updating status
@@ -874,6 +876,9 @@ function getPlanName(subscriptionStatus) {
     
     // Determine plan type
     const subscriptionType = subscriptionStatus.subscriptionType;
+    if (subscriptionType === 'payp' || subscriptionStatus.isOneTimePayment) {
+        return 'PAYP Plan';
+    }
     if (subscriptionType === '6month' || subscriptionType === 'monthly' || subscriptionType === 'pro') {
         return 'Pro Plan';
     }
@@ -970,11 +975,16 @@ async function canCreateTracker() {
             subscriptionStatus = await refreshSubscriptionStatus();
         }
         
-        // Active limit applies to ALL users (2 active trackers max) - DDoS protection
-        if (trackers.length >= 2) {
+        // Active limit based on subscription type
+        // PAYP users (one-time payment): 1 active tracker max
+        // All other users: 2 active trackers max (DDoS protection)
+        const maxActiveTrackers = (subscriptionStatus?.isOneTimePayment || subscriptionStatus?.subscriptionType === 'payp') ? 1 : 2;
+        
+        if (trackers.length >= maxActiveTrackers) {
+            const limitText = maxActiveTrackers === 1 ? '1 active table' : '2 active tables';
             return { 
                 canCreate: false, 
-                reason: 'You can only have 2 active tables at once. Delete a table to create a new one.' 
+                reason: `You can only have ${limitText} at once. Delete a table to create a new one.` 
             };
         }
         
