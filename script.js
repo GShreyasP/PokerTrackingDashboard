@@ -515,6 +515,9 @@ async function loadUserData(userId) {
         const docRef = window.firebaseDb.collection('users').doc(userId);
         const doc = await docRef.get();
         
+        // Initialize credits for user
+        await initializeCredits(userId);
+        
         if (doc.exists) {
             const data = doc.data();
             
@@ -812,9 +815,12 @@ async function updateSubscriptionStatus(userId, subscriptionData) {
             isOneTimePayment: subscriptionData.isOneTimePayment || false
         }, { merge: true });
         
-        // Initialize credits if user just got PAYP subscription
+        // Initialize credits for all users
+        await initializeCredits(userId);
+        
+        // Add +1 credit if user just got PAYP subscription
         if (isNowPayp && !wasPayp) {
-            await initializePaypCredits(userId);
+            await addPaypCredit(userId);
         }
         
         // Update plan display after updating status
@@ -824,34 +830,37 @@ async function updateSubscriptionStatus(userId, subscriptionData) {
     }
 }
 
-// Initialize PAYP credits (set to 1 if not already set)
-async function initializePaypCredits(userId) {
+// Add +1 credit when PAYP plan is purchased
+async function addPaypCredit(userId) {
     if (!window.firebaseDb || !userId) {
         return;
     }
     
     try {
         const userRef = window.firebaseDb.collection('users').doc(userId);
+        await initializeCredits(userId); // Ensure credits exist first
+        
         const userDoc = await userRef.get();
         
         if (userDoc.exists) {
             const userData = userDoc.data();
-            // Only initialize if credits don't exist or are 0
-            if (userData.paypCredits === undefined || userData.paypCredits === null) {
-                await userRef.set({
-                    paypCredits: 1
-                }, { merge: true });
-                console.log('PAYP credits initialized to 1');
-            }
-        } else {
-            // New user, set credits to 1
+            const currentCredits = userData.credits !== undefined ? userData.credits : 3;
+            const newCredits = currentCredits + 1;
+            
             await userRef.set({
-                paypCredits: 1
+                credits: newCredits
             }, { merge: true });
-            console.log('PAYP credits initialized to 1 for new user');
+            
+            console.log(`PAYP plan purchased. Credits increased from ${currentCredits} to ${newCredits}`);
+            
+            // Update credits display in settings if visible
+            const creditsDisplay = document.getElementById('settings-credits-display');
+            if (creditsDisplay) {
+                creditsDisplay.textContent = newCredits;
+            }
         }
     } catch (error) {
-        console.error('Error initializing PAYP credits:', error);
+        console.error('Error adding PAYP credit:', error);
     }
 }
 
@@ -895,9 +904,12 @@ async function refreshSubscriptionStatus() {
         // Update Firestore with latest status
         await updateSubscriptionStatus(userId, subscriptionData);
         
-        // Initialize PAYP credits if user just got PAYP subscription
+        // Initialize credits for all users
+        await initializeCredits(userId);
+        
+        // Add +1 credit if user just purchased PAYP plan
         if (subscriptionData.subscriptionType === 'payp' || subscriptionData.isOneTimePayment) {
-            await initializePaypCredits(userId);
+            await addPaypCredit(userId);
         }
         
         // If subscription just expired, mark all trackers for expiration
@@ -1102,6 +1114,37 @@ async function loadPlanDisplay() {
     }
 }
 
+// Initialize credits for new users (3 credits)
+async function initializeCredits(userId) {
+    if (!window.firebaseDb || !userId) {
+        return;
+    }
+    
+    try {
+        const userRef = window.firebaseDb.collection('users').doc(userId);
+        const userDoc = await userRef.get();
+        
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            // Only initialize if credits don't exist
+            if (userData.credits === undefined || userData.credits === null) {
+                await userRef.set({
+                    credits: 3
+                }, { merge: true });
+                console.log('Credits initialized to 3 for user');
+            }
+        } else {
+            // New user, set credits to 3
+            await userRef.set({
+                credits: 3
+            }, { merge: true });
+            console.log('Credits initialized to 3 for new user');
+        }
+    } catch (error) {
+        console.error('Error initializing credits:', error);
+    }
+}
+
 // Check if user can create more trackers
 async function canCreateTracker() {
     if (!window.firebaseDb || !window.currentUser) {
@@ -1111,6 +1154,9 @@ async function canCreateTracker() {
     try {
         const userId = window.currentUser.uid;
         const userEmail = window.currentUser.email;
+        
+        // Initialize credits if needed
+        await initializeCredits(userId);
         
         // Check if user is whitelisted first (async)
         const whitelisted = await isEmailWhitelisted(userEmail);
@@ -1122,90 +1168,31 @@ async function canCreateTracker() {
         const userDoc = await userRef.get();
         
         if (!userDoc.exists) {
-            return { canCreate: true }; // New user, can create first tracker
+            return { canCreate: true }; // New user, can create first tracker (credits will be initialized)
         }
         
         const userData = userDoc.data();
         const trackers = userData.trackers || [];
-        const totalTrackersCreated = userData.totalTrackersCreated || trackers.length; // Fallback to current count for existing users
         
-        // Check subscription status (pass email for whitelist check)
-        let subscriptionStatus = await getSubscriptionStatus(userId, userEmail);
-        
-        // If subscription status is old (more than 1 hour), refresh it
-        const lastChecked = subscriptionStatus?.lastChecked;
-        const shouldRefresh = !subscriptionStatus?.isWhitelisted && (!lastChecked || 
-            (lastChecked.toDate && new Date() - lastChecked.toDate() > 3600000)); // 1 hour
-        
-        if (shouldRefresh) {
-            subscriptionStatus = await refreshSubscriptionStatus();
+        // Check credits for ALL users (universal credit system)
+        const credits = userData.credits !== undefined ? userData.credits : 3; // Default to 3 if not set
+        if (credits <= 0) {
+            return {
+                canCreate: false,
+                reason: 'You have no credits remaining. Please purchase the Pay as you Play plan ($1.00) to add more credits.',
+                needsCredits: true
+            };
         }
         
-        // Check if user is PAYP
-        const isPaypUser = subscriptionStatus?.subscriptionType === 'payp' || subscriptionStatus?.isOneTimePayment;
-        
-        // For PAYP users, check credits first
-        if (isPaypUser) {
-            const credits = userData.paypCredits || 0;
-            if (credits <= 0) {
-                return {
-                    canCreate: false,
-                    reason: 'You have no credits remaining. Please purchase the Pay as you Play plan again ($1.00) to create another table.',
-                    isPaypUser: true,
-                    needsCredits: true
-                };
-            }
-        }
-        
-        // Active limit based on subscription type
-        // PAYP users (one-time payment): 1 active tracker max
-        // All other users: 2 active trackers max (DDoS protection)
-        const maxActiveTrackers = isPaypUser ? 1 : 2;
-        
-        if (trackers.length >= maxActiveTrackers) {
-            const limitText = maxActiveTrackers === 1 ? '1 active table' : '2 active tables';
+        // Active limit: 2 active trackers max for all users (DDoS protection)
+        if (trackers.length >= 2) {
             return { 
                 canCreate: false, 
-                reason: `You can only have ${limitText} at once. Delete a table to create a new one.` 
+                reason: 'You can only have 2 active tables at once. Delete a table to create a new one.' 
             };
         }
         
-        // If user has active subscription or is whitelisted, allow unlimited lifetime trackers
-        if (subscriptionStatus?.hasSubscription || subscriptionStatus?.isWhitelisted) {
-            // Check if subscription is expired (whitelisted users never expire)
-            if (!subscriptionStatus.isWhitelisted && subscriptionStatus.expiresAt) {
-                const expiresAt = new Date(subscriptionStatus.expiresAt);
-                if (expiresAt < new Date()) {
-                    // Subscription expired, treat as free user
-                    // Check lifetime limit (3 total)
-                    if (totalTrackersCreated >= 3) {
-                        return { 
-                            canCreate: false, 
-                            reason: 'You have reached your lifetime limit of 3 free tables. Subscribe to create unlimited tables.' 
-                        };
-                    }
-                    // Active limit already checked above
-                    return { canCreate: true };
-                }
-            }
-            // Active subscription or whitelisted - unlimited lifetime trackers (but still 2 active max)
-            return { 
-                canCreate: true, 
-                subscriptionType: subscriptionStatus.subscriptionType || 'pro',
-                isPaypUser: isPaypUser
-            };
-        }
-        
-        // Free tier: Check lifetime limit (3 total trackers ever created)
-        if (totalTrackersCreated >= 3) {
-            return { 
-                canCreate: false, 
-                reason: 'You have reached your lifetime limit of 3 free tables. Subscribe to create unlimited tables.' 
-            };
-        }
-        
-        // Active limit already checked above for all users
-        
+        // All users can create trackers if they have credits and aren't at active limit
         return { canCreate: true };
     } catch (error) {
         console.error('Error checking if user can create tracker:', error);
@@ -1240,24 +1227,19 @@ async function showSetupSection() {
         return;
     }
     
-    // Check if user is PAYP and has credits - show confirmation
-    if (canCreate.subscriptionType === 'payp' || canCreate.isPaypUser) {
-        const userId = window.currentUser.uid;
-        const userEmail = window.currentUser.email;
-        const subscriptionStatus = await getSubscriptionStatus(userId, userEmail);
-        
-        if (subscriptionStatus?.subscriptionType === 'payp' || subscriptionStatus?.isOneTimePayment) {
-            const userRef = window.firebaseDb.collection('users').doc(userId);
-            const userDoc = await userRef.get();
-            const userData = userDoc.exists ? userDoc.data() : {};
-            const credits = userData.paypCredits || 0;
-            
-            if (credits > 0) {
-                // Show confirmation modal
-                showConfirmModal(credits);
-                return; // Don't proceed yet, wait for confirmation
-            }
-        }
+    // Show confirmation for all users with credits (universal credit system)
+    const userId = window.currentUser.uid;
+    await initializeCredits(userId);
+    
+    const userRef = window.firebaseDb.collection('users').doc(userId);
+    const userDoc = await userRef.get();
+    const userData = userDoc.exists ? userDoc.data() : {};
+    const credits = userData.credits !== undefined ? userData.credits : 3;
+    
+    if (credits > 0) {
+        // Show confirmation modal for all users
+        showConfirmModal(credits);
+        return; // Don't proceed yet, wait for confirmation
     }
     
     // Hide error message if visible
@@ -3569,11 +3551,15 @@ async function loadSettingsData() {
     
     try {
         const userId = window.currentUser.uid;
+        // Initialize credits if needed
+        await initializeCredits(userId);
+        
         const userDocRef = window.firebaseDb.collection('users').doc(userId);
         const userDoc = await userDocRef.get();
         
         const usernameInput = document.getElementById('settings-username');
         const uniqueIdInput = document.getElementById('settings-unique-id');
+        const creditsDisplay = document.getElementById('settings-credits-display');
         
         if (userDoc.exists) {
             const userData = userDoc.data();
@@ -3587,10 +3573,20 @@ async function loadSettingsData() {
             if (uniqueIdInput) {
                 uniqueIdInput.value = userData.uniqueId || '';
             }
+            
+            // Load and display credits
+            if (creditsDisplay) {
+                const credits = userData.credits !== undefined ? userData.credits : 3;
+                creditsDisplay.textContent = credits;
+            }
         } else {
             // If no user doc exists, use auth data
             if (usernameInput) {
                 usernameInput.value = window.currentUser.displayName || window.currentUser.email || '';
+            }
+            // Show default credits
+            if (creditsDisplay) {
+                creditsDisplay.textContent = '3';
             }
         }
     } catch (error) {
@@ -6144,26 +6140,34 @@ function closeConfirmModal() {
 async function confirmCreateTracker() {
     closeConfirmModal();
     
-    // Decrement PAYP credit
+    // Decrement universal credits for all users
     if (window.currentUser && window.firebaseDb) {
         try {
             const userId = window.currentUser.uid;
+            await initializeCredits(userId); // Ensure credits exist
+            
             const userRef = window.firebaseDb.collection('users').doc(userId);
             const userDoc = await userRef.get();
             
             if (userDoc.exists) {
                 const userData = userDoc.data();
-                const currentCredits = userData.paypCredits || 0;
+                const currentCredits = userData.credits !== undefined ? userData.credits : 3;
                 const newCredits = Math.max(0, currentCredits - 1);
                 
                 await userRef.set({
-                    paypCredits: newCredits
+                    credits: newCredits
                 }, { merge: true });
                 
-                console.log(`PAYP credit used. Remaining credits: ${newCredits}`);
+                console.log(`Credit used. Remaining credits: ${newCredits}`);
+                
+                // Update credits display in settings if visible
+                const creditsDisplay = document.getElementById('settings-credits-display');
+                if (creditsDisplay) {
+                    creditsDisplay.textContent = newCredits;
+                }
             }
         } catch (error) {
-            console.error('Error decrementing PAYP credit:', error);
+            console.error('Error decrementing credit:', error);
         }
     }
     
