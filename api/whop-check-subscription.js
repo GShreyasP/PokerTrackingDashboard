@@ -142,8 +142,12 @@ export default async function handler(req, res) {
       }
     }
     
-    // Fetch payments to get the "reason" field
+    // Fetch payments FIRST - one-time PAYP payments might not create memberships
     // Payments contain the reason field that shows "One time payment"
+    let allPayments = [];
+    let paypPaymentCount = 0;
+    let matchedPaymentsDebug = [];
+    
     try {
       const paymentsResponse = await fetch(`https://api.whop.com/api/v2/payments`, {
         method: 'GET',
@@ -155,21 +159,100 @@ export default async function handler(req, res) {
       
       if (paymentsResponse.ok) {
         const paymentsData = await paymentsResponse.json();
-        // Find payment for this user
-        matchingPayment = paymentsData.data?.find(payment => {
+        allPayments = paymentsData.data || [];
+        
+        // Find all PAYP payments for this user ($1, one-time)
+        const userPaypPayments = allPayments.filter(payment => {
           const paymentEmail = payment.user?.email || payment.email || '';
-          return paymentEmail.toLowerCase() === authenticatedEmail;
+          const paymentAmount = payment.amount || payment.plan?.price || 0;
+          const paymentReason = (payment.reason || '').toLowerCase();
+          const normalizedAmount = typeof paymentAmount === 'number' ? paymentAmount : parseFloat(String(paymentAmount).replace(/[^0-9.]/g, ''));
+          
+          const emailMatches = paymentEmail.toLowerCase() === authenticatedEmail;
+          const isOneDollar = normalizedAmount === 1 || normalizedAmount === 1.0;
+          const isOneTime = paymentReason.includes('one time payment') || 
+                           paymentReason.includes('one-time payment') || 
+                           paymentReason.includes('onetime payment') ||
+                           payment.status === 'succeeded';
+          
+          if (emailMatches && isOneDollar && isOneTime) {
+            matchedPaymentsDebug.push({
+              id: payment.id,
+              email: paymentEmail,
+              amount: paymentAmount,
+              normalizedAmount: normalizedAmount,
+              reason: payment.reason,
+              status: payment.status,
+              created_at: payment.created_at
+            });
+            return true;
+          }
+          
+          return false;
         });
+        
+        paypPaymentCount = userPaypPayments.length;
+        
+        // If we found PAYP payments, use the first one as matchingPayment
+        if (userPaypPayments.length > 0) {
+          matchingPayment = userPaypPayments[0];
+        }
+        
+        // If we found PAYP payments but no membership, user still has PAYP subscription
+        // (one-time payments might not create active memberships)
+        if (paypPaymentCount > 0 && !matchingMembership) {
+          console.log('=== PAYP PAYMENTS FOUND BUT NO MEMBERSHIP ===');
+          console.log('Found', paypPaymentCount, 'PAYP payments for', authenticatedEmail);
+          console.log('Payments:', JSON.stringify(matchedPaymentsDebug, null, 2));
+          console.log('Treating as PAYP subscription based on payments');
+          console.log('===============================================');
+          
+          // Return PAYP subscription status based on payments
+          return res.status(200).json({
+            hasSubscription: true,
+            subscriptionType: 'payp',
+            expiresAt: null, // One-time payments don't expire
+            memberId: null,
+            isOneTimePayment: true,
+            paypPaymentCount: paypPaymentCount,
+            debug: {
+              authenticatedEmail: authenticatedEmail,
+              membershipEmail: null,
+              paymentEmail: matchingPayment?.user?.email || matchingPayment?.email,
+              planPrice: matchingPayment?.amount || 1,
+              normalizedPrice: 1,
+              reason: matchingPayment?.reason || 'one time payment',
+              isOneDollar: true,
+              isPaypByPriceAndReason: true,
+              totalPaymentsFound: allPayments.length,
+              matchedPayments: matchedPaymentsDebug,
+              note: 'Subscription detected from payments only (no membership found)'
+            }
+          });
+        }
+      } else {
+        const errorText = await paymentsResponse.text();
+        console.error('Error fetching payments:', paymentsResponse.status, errorText);
       }
     } catch (error) {
       console.error('Error fetching payments:', error);
     }
     
-    if (!matchingMembership) {
+    // If no membership AND no payments found, return no subscription
+    if (!matchingMembership && paypPaymentCount === 0) {
+      console.log('=== NO MEMBERSHIP AND NO PAYMENTS FOUND ===');
+      console.log('Email:', authenticatedEmail);
+      console.log('Total payments in system:', allPayments.length);
+      console.log('===========================================');
       return res.status(200).json({ 
         hasSubscription: false,
         subscriptionType: null,
-        expiresAt: null
+        expiresAt: null,
+        debug: {
+          authenticatedEmail: authenticatedEmail,
+          totalPaymentsFound: allPayments.length,
+          note: 'No membership or PAYP payments found'
+        }
       });
     }
     
@@ -307,82 +390,27 @@ export default async function handler(req, res) {
     }, null, 2));
     console.log('====================================');
     
-    // Count PAYP payments for this user
-    let paypPaymentCount = 0;
-    let allPaymentsDebug = [];
-    let matchedPaymentsDebug = [];
+    // Use the payment count we already calculated above
+    // (paypPaymentCount and matchedPaymentsDebug are already set from the earlier payment fetch)
     
-    // Always try to fetch payments to count PAYP purchases
-    try {
-      const paymentsResponse = await fetch(`https://api.whop.com/api/v2/payments`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${whopApiKey}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (paymentsResponse.ok) {
-        const paymentsData = await paymentsResponse.json();
-        const allPayments = paymentsData.data || [];
-        
-        // Log all payments for debugging
-        allPaymentsDebug = allPayments.map(p => ({
-          id: p.id,
-          email: p.user?.email || p.email || 'no email',
-          amount: p.amount || p.plan?.price || 'no amount',
-          reason: p.reason || 'no reason',
-          status: p.status || 'no status',
-          created_at: p.created_at || 'no date'
-        }));
-        
-        // Filter payments for this user that are PAYP ($1, one-time)
-        const userPayments = allPayments.filter(payment => {
-          const paymentEmail = payment.user?.email || payment.email || '';
-          const paymentAmount = payment.amount || payment.plan?.price || 0;
-          const paymentReason = (payment.reason || '').toLowerCase();
-          const normalizedAmount = typeof paymentAmount === 'number' ? paymentAmount : parseFloat(String(paymentAmount).replace(/[^0-9.]/g, ''));
-          
-          const emailMatches = paymentEmail.toLowerCase() === authenticatedEmail;
-          const isOneDollar = normalizedAmount === 1 || normalizedAmount === 1.0;
-          const isOneTime = paymentReason.includes('one time payment') || 
-                           paymentReason.includes('one-time payment') || 
-                           paymentReason.includes('onetime payment') ||
-                           payment.status === 'succeeded';
-          
-          if (emailMatches && isOneDollar && isOneTime) {
-            matchedPaymentsDebug.push({
-              id: payment.id,
-              email: paymentEmail,
-              amount: paymentAmount,
-              normalizedAmount: normalizedAmount,
-              reason: payment.reason,
-              status: payment.status,
-              created_at: payment.created_at
-            });
-            return true;
-          }
-          
-          return false;
-        });
-        
-        paypPaymentCount = userPayments.length;
-        
-        // Detailed logging
-        console.log('=== PAYP PAYMENT COUNTING DEBUG ===');
-        console.log('Authenticated Email:', authenticatedEmail);
-        console.log('Total payments in system:', allPayments.length);
-        console.log('All payments (first 10):', JSON.stringify(allPaymentsDebug.slice(0, 10), null, 2));
-        console.log('Matched PAYP payments:', JSON.stringify(matchedPaymentsDebug, null, 2));
-        console.log('PAYP Payment Count:', paypPaymentCount);
-        console.log('===================================');
-      } else {
-        const errorText = await paymentsResponse.text();
-        console.error('Error fetching payments:', paymentsResponse.status, errorText);
-      }
-    } catch (error) {
-      console.error('Error counting PAYP payments:', error);
-    }
+    // Log all payments for debugging (if we haven't already)
+    const allPaymentsDebug = allPayments.map(p => ({
+      id: p.id,
+      email: p.user?.email || p.email || 'no email',
+      amount: p.amount || p.plan?.price || 'no amount',
+      reason: p.reason || 'no reason',
+      status: p.status || 'no status',
+      created_at: p.created_at || 'no date'
+    }));
+    
+    // Detailed logging
+    console.log('=== PAYP PAYMENT COUNTING DEBUG ===');
+    console.log('Authenticated Email:', authenticatedEmail);
+    console.log('Total payments in system:', allPayments.length);
+    console.log('All payments (first 10):', JSON.stringify(allPaymentsDebug.slice(0, 10), null, 2));
+    console.log('Matched PAYP payments:', JSON.stringify(matchedPaymentsDebug, null, 2));
+    console.log('PAYP Payment Count:', paypPaymentCount);
+    console.log('===================================');
     
     return res.status(200).json({
       hasSubscription: true,
